@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.example.smartclass.EnrollmentPanelController"
+      spacing="15" padding="20" style="-fx-background-color: white;">
+
+    <!-- Search Field -->
+    <HBox spacing="10">
+        <TextField fx:id="searchField" promptText="Enter Student ID or Name">
+            <HBox.hgrow>
+                <Priority>ALWAYS</Priority>
+            </HBox.hgrow>
+        </TextField>
+        <Button text="Search" onAction="#onSearchStudent"/>
+    </HBox>
+
+    <!-- Student Info -->
+    <GridPane hgap="10" vgap="10">
+        <Label text="Student ID:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <Label fx:id="studentIdLabel" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+        <Label text="Student Name:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <Label fx:id="studentNameLabel" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+        <Label text="Program:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <Label fx:id="programLabel" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+    </GridPane>
+
+    <!-- Term Dropdown -->
+    <HBox spacing="10">
+        <Label text="Term:"/>
+        <ComboBox fx:id="termComboBox" prefWidth="200"/>
+    </HBox>
+
+    <!-- Courses Table -->
+    <Label text="Select Courses:"/>
+    <TableView fx:id="coursesTable" prefHeight="300">
+        <columns>
+            <TableColumn fx:id="codeColumn" text="Course Code" prefWidth="150"/>
+            <TableColumn fx:id="nameColumn" text="Course Name" prefWidth="300"/>
+            <TableColumn fx:id="prereqColumn" text="Prerequisites" prefWidth="200"/>
+            <TableColumn fx:id="enrolledColumn" text="Enrolled" prefWidth="100"/>
+        </columns>
+    </TableView>
+
+    <!-- Save Button -->
+    <Button text="Save Enrollment" onAction="#onSaveEnrollment" maxWidth="200"/>
+
+</VBox>

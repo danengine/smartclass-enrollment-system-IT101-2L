@@ -1,0 +1,34 @@
+.text-field {
+    -fx-font-size: 14px;
+    -fx-padding: 10 14;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-background-color: white;
+    -fx-border-color: #ccc;
+}
+
+.login-button {
+    -fx-background-color: #1e3d59;
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 16;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.login-button:hover {
+    -fx-background-color: #163045;
+}
+
+.error-message {
+    -fx-text-fill: red;
+    -fx-font-size: 13px;
+}
+
+.minimal-spinner {
+    -fx-progress-color: #1e3d59;
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+    -fx-opacity: 0.8;
+}

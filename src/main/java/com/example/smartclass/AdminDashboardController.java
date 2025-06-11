@@ -1,0 +1,1081 @@
+package com.example.smartclass;
+
+import eu.hansolo.tilesfx.Tile;
+import eu.hansolo.tilesfx.TileBuilder;
+import eu.hansolo.tilesfx.chart.ChartData;
+import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.util.Callback;
+import javafx.util.Duration;
+import javafx.util.converter.IntegerStringConverter;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.function.Function;
+
+public class AdminDashboardController {
+
+    @FXML
+    private StackPane mainContent;
+
+    private void setMainContent(Node newContent) {
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(200), mainContent);
+        fadeOut.setFromValue(1);
+        fadeOut.setToValue(0);
+        fadeOut.setOnFinished(event -> {
+            mainContent.getChildren().setAll(newContent);
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(200), mainContent);
+            fadeIn.setFromValue(0);
+            fadeIn.setToValue(1);
+            fadeIn.play();
+        });
+        fadeOut.play();
+    }
+
+
+    @FXML
+    private void initialize() {
+        showDashboard(); // Load dashboard on start
+    }
+
+    @FXML
+    private void onDashboardClick() {
+        showDashboard();
+    }
+
+    private void showDashboard() {
+        // Start with 0s for animation
+        ChartData ccis = new ChartData("CCIS", 0, Tile.BLUE);
+        ChartData cba  = new ChartData("CBA", 0, Tile.GREEN);
+        ChartData cea  = new ChartData("CEA", 0, Tile.ORANGE);
+        ChartData chm  = new ChartData("CHM", 0, Tile.RED);
+
+        double ccisTarget = 200;
+        double cbaTarget  = 40;
+        double ceaTarget  = 20;
+        double chmTarget  = 15;
+        double instructorsTarget = 14;
+
+        // Donut chart tile
+        Tile enrollmentTile = TileBuilder.create()
+                .skinType(Tile.SkinType.DONUT_CHART)
+                .title("Enrollment by Department")
+                .text("2025 Term")
+                .animated(true) // Enables animated transitions in donut
+                .chartData(ccis, cba, cea, chm)
+                .titleColor(Color.BLACK)
+                .textColor(Color.BLACK)
+                .valueColor(Color.BLACK)
+                .backgroundColor(Color.web("#f8f9fa"))
+                .roundedCorners(true)
+                .prefSize(320, 260)
+                .build();
+
+        // Number tile
+        Tile instructorsTile = TileBuilder.create()
+                .skinType(Tile.SkinType.NUMBER)
+                .title("Total Instructors")
+                .unit("persons")
+                .value(0) // Start at 0 for smooth animation
+                .animated(true)
+                .titleColor(Color.BLACK)
+                .textColor(Color.BLACK)
+                .valueColor(Color.BLACK)
+                .backgroundColor(Color.web("#f8f9fa"))
+                .roundedCorners(true)
+                .prefSize(200, 150)
+                .build();
+
+        HBox cardsRow = new HBox(20, enrollmentTile, instructorsTile);
+        cardsRow.setPadding(new Insets(20, 20, 10, 20));
+        cardsRow.setAlignment(Pos.TOP_LEFT);
+
+        VBox dashboardLayout = new VBox(cardsRow);
+        dashboardLayout.setPadding(new Insets(20));
+        dashboardLayout.setAlignment(Pos.TOP_LEFT);
+        dashboardLayout.setPrefHeight(400);  // Keeps space below empty
+        dashboardLayout.setStyle("-fx-background-color: white;");
+
+        setMainContent(dashboardLayout);
+
+        // Animate the data updates
+        Timeline timeline = new Timeline();
+        int steps = 60;
+        Duration duration = Duration.seconds(1);
+        for (int i = 0; i <= steps; i++) {
+            double frac = i / (double) steps;
+            timeline.getKeyFrames().add(new KeyFrame(duration.multiply(frac), e -> {
+                ccis.setValue(frac * ccisTarget);
+                cba.setValue(frac * cbaTarget);
+                cea.setValue(frac * ceaTarget);
+                chm.setValue(frac * chmTarget);
+                instructorsTile.setValue(frac * instructorsTarget);
+            }));
+        }
+        timeline.play();
+    }
+
+
+    // Other nav actions
+    @FXML
+    private void onManageStudentsClick() {
+        loadView("students-table.fxml");
+    }
+
+    private void loadView(String fxmlFile) {
+        try {
+            Node node = FXMLLoader.load(getClass().getResource(fxmlFile));
+            setMainContent(node);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    private void onManageProgramsClick() {
+        showProgramsTable();
+    }
+
+    private void showProgramsTable() {
+        TableView<String> programTable = new TableView<>();
+        TableColumn<String, String> programCol = new TableColumn<>("Program");
+        programCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()));
+        programCol.setPrefWidth(500);
+        programTable.getColumns().add(programCol);
+
+        ObservableList<String> programs = Database.showPrograms();
+        programTable.setItems(programs);
+
+        programTable.setRowFactory(tv -> {
+            TableRow<String> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty() && event.getClickCount() == 2) {
+                    String selectedProgram = row.getItem();
+                    openCoursesWindow(selectedProgram);
+                }
+            });
+            return row;
+        });
+
+        Button createProgramButton = new Button("+ Create Program");
+        createProgramButton.setOnAction(e -> {
+            // Show dialog or form to enter program name
+            TextInputDialog dialog = new TextInputDialog();
+            dialog.setTitle("Add Program");
+            dialog.setHeaderText("Enter new program name:");
+            dialog.showAndWait().ifPresent(name -> {
+                Database.addProgram(name);
+                programTable.setItems(Database.showPrograms()); // Refresh
+            });
+        });
+
+        Button deleteProgramButton = new Button("Delete Program");
+        deleteProgramButton.setDisable(true);
+        deleteProgramButton.setOnAction(e -> {
+            String selected = programTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to delete this program? This will also delete all its courses.", ButtonType.YES, ButtonType.NO);
+                confirm.setHeaderText("Delete Program");
+                confirm.showAndWait().ifPresent(type -> {
+                    if (type == ButtonType.YES) {
+                        Database.deleteProgram(selected);
+                        programTable.setItems(Database.showPrograms()); // Refresh
+                    }
+                });
+            }
+        });
+        programTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+            deleteProgramButton.setDisable(newSel == null);
+        });
+
+        HBox buttonBox = new HBox(10, createProgramButton, deleteProgramButton);
+        VBox layout = new VBox(10, new Label("Programs"), programTable, buttonBox);
+        layout.setPadding(new Insets(20));
+        setMainContent(layout);
+    }
+
+    private <T> TableColumn<Course, T> createEditableColumn(String title,
+                                                            Function<Course, ObservableValue<T>> prop, double width,
+                                                            Callback<TableColumn<Course, T>, TableCell<Course, T>> cellFactory) {
+        TableColumn<Course, T> col = new TableColumn<>(title);
+        col.setCellValueFactory(cellData -> prop.apply(cellData.getValue()));
+        col.setCellFactory(cellFactory);
+        col.setOnEditCommit(event -> {
+            Course course = event.getRowValue();
+            if (col.getText().equals("Course Code")) {
+                course.courseCodeProperty().set(event.getNewValue().toString());
+            } else if (col.getText().equals("Course Name")) {
+                course.courseNameProperty().set(event.getNewValue().toString());
+            } else if (col.getText().equals("Prerequisites")) {
+                course.prerequisitesProperty().set(event.getNewValue().toString());
+            }
+        });
+        col.setPrefWidth(width);
+        return col;
+    }
+
+
+    private void openCoursesWindow(String program) {
+        Stage courseStage = new Stage();
+        courseStage.setTitle(program + " Courses");
+
+        TableView<Course> courseTable = new TableView<>();
+        courseTable.setEditable(true);
+
+        TableColumn<Course, Integer> unitsCol = createEditableColumn("Units", c -> c.unitsProperty().asObject(), 80,
+                TextFieldTableCell.<Course, Integer>forTableColumn(new IntegerStringConverter()));
+        unitsCol.setOnEditCommit(event -> {
+            Course course = event.getRowValue();
+            course.setUnits(event.getNewValue());
+            Database.saveCoursesForProgram(program, courseTable.getItems());
+        });
+        courseTable.getColumns().addAll(
+                createEditableColumn("Course Code", Course::courseCodeProperty, 120,
+                        TextFieldTableCell.forTableColumn()),
+                createEditableColumn("Course Name", Course::courseNameProperty, 200,
+                        TextFieldTableCell.forTableColumn()),
+                unitsCol
+        );
+
+
+        ObservableList<Course> courseList = Database.getCoursesByProgram(program);
+        courseTable.setItems(courseList);
+
+        Button addCourseBtn = new Button("+ Add Course");
+        addCourseBtn.setOnAction(e -> {
+            Dialog<Course> dialog = new Dialog<>();
+            dialog.setTitle("Add New Course");
+
+            GridPane grid = new GridPane();
+            TextField codeField = new TextField();
+            TextField nameField = new TextField();
+            TextField unitsField = new TextField();
+
+            grid.add(new Label("Code:"), 0, 0);
+            grid.add(codeField, 1, 0);
+            grid.add(new Label("Name:"), 0, 1);
+            grid.add(nameField, 1, 1);
+            grid.add(new Label("Units:"), 0, 2);
+            unitsField.setPromptText("0");
+            grid.add(unitsField, 1, 2);
+
+            dialog.getDialogPane().setContent(grid);
+            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+            dialog.setResultConverter(btn -> {
+                if (btn == ButtonType.OK) {
+                    int units = 0;
+                    try { units = Integer.parseInt(unitsField.getText().trim()); } catch (Exception ignored) {}
+                    Course course = new Course(codeField.getText(), nameField.getText(), "", units);
+                    Database.addCourseToProgram(program, course);
+                    return course;
+                }
+                return null;
+            });
+
+            dialog.showAndWait().ifPresent(course -> {
+                courseList.add(course);
+            });
+        });
+
+        Button deleteCourseBtn = new Button("Delete Course");
+        deleteCourseBtn.setDisable(true);
+        deleteCourseBtn.setOnAction(e -> {
+            Course selected = courseTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to delete this course?", ButtonType.YES, ButtonType.NO);
+                confirm.setHeaderText("Delete Course");
+                confirm.showAndWait().ifPresent(type -> {
+                    if (type == ButtonType.YES) {
+                        courseList.remove(selected);
+                        Database.saveCoursesForProgram(program, courseList);
+                    }
+                });
+            }
+        });
+        courseTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+            deleteCourseBtn.setDisable(newSel == null);
+        });
+
+        Button uploadPdfBtn = new Button("Upload from PDF (AI)");
+        uploadPdfBtn.setOnAction(e -> {
+            Stage uploadStage = new Stage();
+            uploadStage.setTitle("Upload PDF and Extract Courses");
+            uploadStage.initModality(Modality.APPLICATION_MODAL);
+
+            GridPane grid = new GridPane();
+            grid.setPadding(new Insets(20));
+            grid.setHgap(12);
+            grid.setVgap(10);
+            grid.setStyle("-fx-background-color: white;");
+
+            Label uploadLabel = new Label("Select a PDF file to extract courses:");
+            Button selectFileBtn = new Button("Choose File");
+            Label fileNameLabel = new Label("");
+            TableView<String[]> extractedTable = new TableView<>();
+            extractedTable.setPrefHeight(220);
+            extractedTable.setPrefWidth(500);
+            String[] pdfHeaders = {"Code", "Name", "Units"};
+            for (int i = 0; i < pdfHeaders.length; i++) {
+                final int idx = i;
+                TableColumn<String[], String> col = new TableColumn<>(pdfHeaders[i]);
+                col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[idx]));
+                col.setPrefWidth(150);
+                col.setCellFactory(TextFieldTableCell.forTableColumn());
+                col.setOnEditCommit(ev -> {
+                    String[] row = ev.getRowValue();
+                    row[idx] = ev.getNewValue();
+                    extractedTable.refresh();
+                });
+                extractedTable.getColumns().add(col);
+            }
+            extractedTable.setEditable(true);
+            ObservableList<String[]> extractedData = FXCollections.observableArrayList();
+            extractedTable.setItems(extractedData);
+
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+            final File[] selectedFile = {null};
+
+            Button generateBtn = new Button("Generate");
+            generateBtn.setDisable(true);
+            ProgressIndicator loading = new ProgressIndicator();
+            loading.setVisible(false);
+            loading.setPrefSize(32, 32);
+            Button addBtn = new Button("Add");
+            addBtn.setDisable(true);
+
+            selectFileBtn.setOnAction(ev -> {
+                File file = fileChooser.showOpenDialog(uploadStage);
+                if (file != null) {
+                    selectedFile[0] = file;
+                    fileNameLabel.setText(file.getName());
+                    generateBtn.setDisable(false);
+                }
+            });
+
+            generateBtn.setOnAction(ev -> {
+                if (selectedFile[0] != null) {
+                    loading.setVisible(true);
+                    generateBtn.setDisable(true);
+                    addBtn.setDisable(true);
+                    new Thread(() -> {
+                        try {
+                            String response = HttpUtils.uploadPdfAndGetCourses(selectedFile[0], "http://127.0.0.1:3000/analyze-program-pdf");
+                            // Parse JSON response
+                            org.json.JSONObject obj = new org.json.JSONObject(response);
+                            org.json.JSONArray arr = obj.getJSONArray("courses");
+                            ObservableList<String[]> parsed = FXCollections.observableArrayList();
+                            for (int i = 0; i < arr.length(); i++) {
+                                org.json.JSONObject c = arr.getJSONObject(i);
+                                String code = c.optString("courseCode", "");
+                                String name = c.optString("courseName", "");
+                                String units = String.valueOf(c.optInt("creditUnits", 0));
+                                parsed.add(new String[]{code, name, units});
+                            }
+                            javafx.application.Platform.runLater(() -> {
+                                extractedData.setAll(parsed);
+                                loading.setVisible(false);
+                                generateBtn.setDisable(false);
+                                addBtn.setDisable(false);
+                            });
+                        } catch (Exception ex) {
+                            javafx.application.Platform.runLater(() -> {
+                                loading.setVisible(false);
+                                generateBtn.setDisable(false);
+                                addBtn.setDisable(true);
+                                Alert alert = new Alert(Alert.AlertType.ERROR, "Failed to analyze PDF: " + ex.getMessage());
+                                alert.showAndWait();
+                            });
+                        }
+                    }).start();
+                }
+            });
+
+            addBtn.setOnAction(ev -> {
+                for (String[] row : extractedData) {
+                    boolean exists = courseList.stream().anyMatch(c -> c.courseCodeProperty().get().equals(row[0]));
+                    if (!exists) {
+                        int units = 0;
+                        try { units = Integer.parseInt(row[2]); } catch (Exception ignored) {}
+                        courseList.add(new Course(row[0], row[1], "", units));
+                    }
+                }
+                uploadStage.close();
+            });
+
+            grid.add(uploadLabel, 0, 0, 2, 1);
+            grid.add(selectFileBtn, 0, 1);
+            grid.add(fileNameLabel, 1, 1);
+            grid.add(generateBtn, 0, 2);
+            grid.add(loading, 1, 2);
+            grid.add(extractedTable, 0, 3, 2, 1);
+            grid.add(addBtn, 1, 4);
+
+            Scene uploadScene = new Scene(grid, 540, 420);
+            uploadStage.setScene(uploadScene);
+            uploadStage.showAndWait();
+        });
+
+        HBox buttonBox = new HBox(10, addCourseBtn, deleteCourseBtn, uploadPdfBtn);
+        VBox root = new VBox(10, new Label("Courses in " + program), courseTable, buttonBox);
+        root.setPadding(new Insets(20));
+
+        courseStage.setScene(new Scene(root, 700, 450));
+        courseStage.initModality(Modality.APPLICATION_MODAL);
+        courseStage.show();
+
+        courseStage.setOnCloseRequest(event -> {
+            Database.saveCoursesForProgram(program, courseList);
+        });
+    }
+
+    private <T> TableColumn<Course, T> createColumn(String title, Function<Course, ObservableValue<T>> prop, double width) {
+        TableColumn<Course, T> col = new TableColumn<>(title);
+        col.setCellValueFactory(data -> prop.apply(data.getValue()));
+        col.setPrefWidth(width);
+        return col;
+    }
+
+    @FXML
+    private void onEnrollmentsClick() {
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        layout.setStyle("-fx-background-color: white;");
+
+        // Term selection
+        ComboBox<String> termBox = new ComboBox<>();
+        termBox.setPromptText("Select Term");
+        File termsFile = new File("terms.csv");
+        if (termsFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(termsFile))) {
+                java.util.List<String> terms = new java.util.ArrayList<>();
+                br.lines().forEach(terms::add);
+                termBox.getItems().addAll(terms);
+                if (!terms.isEmpty()) {
+                    termBox.setValue(terms.get(terms.size() - 1));
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Search field
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search by ID or Name...");
+        searchField.setPrefWidth(250);
+
+        // Table setup
+        TableView<String[]> table = new TableView<>();
+        String[] headers = {"Student ID", "Student Name", "Program", "Year", "Status"};
+        for (int i = 0; i < headers.length; i++) {
+            final int idx = i;
+            TableColumn<String[], String> col = new TableColumn<>(headers[i]);
+            col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[idx]));
+            col.setPrefWidth(150);
+            table.getColumns().add(col);
+        }
+        ObservableList<String[]> data = FXCollections.observableArrayList();
+        FilteredList<String[]> filtered = new FilteredList<>(data, s -> true);
+        table.setItems(filtered);
+
+        // Load enrollments for selected term
+        Runnable refreshTable = () -> {
+            data.clear();
+            File enrollmentsFile = new File("enrollments.csv");
+            String selectedTerm = termBox.getValue();
+            if (enrollmentsFile.exists() && selectedTerm != null) {
+                try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
+                    String header = br.readLine(); // skip header
+                    br.lines()
+                            .map(line -> line.split(",", -1))
+                            .filter(arr -> arr.length >= 6 && arr[5].equals(selectedTerm))
+                            .forEach(arr -> data.add(new String[]{arr[0], arr[1], arr[2], arr[3], arr[4]}));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        // Filter by search
+        searchField.textProperty().addListener((obs, old, val) -> {
+            String search = val.toLowerCase();
+            filtered.setPredicate(arr -> arr[0].toLowerCase().contains(search) || arr[1].toLowerCase().contains(search));
+        });
+
+        // Refresh table when term changes
+        termBox.valueProperty().addListener((obs, old, val) -> refreshTable.run());
+
+        refreshTable.run();
+
+        // Enable double-click to edit enrollment
+        table.setRowFactory(tv -> {
+            TableRow<String[]> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty() && event.getClickCount() == 2) {
+                    String[] enrollment = row.getItem();
+                    String studentId = enrollment[0];
+                    // Fetch full student record from students.csv
+                    String[] fullStudent = null;
+                    File studentsFile = new File("students.csv");
+                    if (studentsFile.exists()) {
+                        try (BufferedReader br = new BufferedReader(new FileReader(studentsFile))) {
+                            br.readLine(); // skip header
+                            fullStudent = br.lines()
+                                    .map(line -> line.split(",", -1))
+                                    .filter(arr -> arr.length > 8 && arr[0].equals(studentId))
+                                    .findFirst().orElse(null);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    if (fullStudent != null) {
+                        showStudentEnrollmentDialog(fullStudent, termBox.getValue(), refreshTable);
+                        refreshTable.run();
+                    } else {
+                        Alert alert = new Alert(Alert.AlertType.ERROR, "Full student record not found.");
+                        alert.showAndWait();
+                    }
+                }
+            });
+            return row;
+        });
+
+        Button enrollBtn = new Button("+ Enroll a Student");
+        enrollBtn.setOnAction(e -> enrollStudent(termBox.getValue(), refreshTable));
+
+        // --- Delete Button ---
+        Button deleteBtn = new Button("Delete Student");
+        deleteBtn.setDisable(true);
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+            deleteBtn.setDisable(newSel == null);
+        });
+        deleteBtn.setOnAction(e -> {
+            String[] selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to delete this student from enrollments? This will also delete their data for this term.", ButtonType.YES, ButtonType.NO);
+                confirm.setHeaderText("Delete Student Enrollment");
+                confirm.showAndWait().ifPresent(type -> {
+                    if (type == ButtonType.YES) {
+                        String studentId = selected[0];
+                        String term = termBox.getValue();
+                        // Remove from enrollments.csv
+                        File enrollmentsFile = new File("enrollments.csv");
+                        java.util.List<String> allLines = new java.util.ArrayList<>();
+                        if (enrollmentsFile.exists()) {
+                            try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
+                                String header = br.readLine();
+                                if (header != null) allLines.add(header);
+                                br.lines().forEach(allLines::add);
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                        java.util.List<String> filteredLines = new java.util.ArrayList<>();
+                        if (!allLines.isEmpty()) filteredLines.add(allLines.get(0));
+                        for (int i = 1; i < allLines.size(); i++) {
+                            String line = allLines.get(i);
+                            String[] arr = line.split(",", -1);
+                            if (arr.length >= 6) {
+                                if (!(arr[0].equals(studentId) && arr[5].equals(term))) {
+                                    filteredLines.add(line);
+                                }
+                            } else if (!line.trim().isEmpty()) {
+                                filteredLines.add(line);
+                            }
+                        }
+                        try (java.io.FileWriter fw = new java.io.FileWriter(enrollmentsFile, false)) {
+                            for (String line : filteredLines) {
+                                fw.write(line + "\n");
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                        // Delete student/{studentid}/{term} folder
+                        File termDir = new File("students/" + studentId + "/" + term);
+                        if (termDir.exists() && termDir.isDirectory()) {
+                            deleteDirectory(termDir);
+                        }
+                        refreshTable.run();
+                    }
+                });
+            }
+        });
+
+        HBox topBar = new HBox(10, new Label("Term:"), termBox, searchField);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        HBox buttonBar = new HBox(10, enrollBtn, deleteBtn);
+        layout.getChildren().addAll(topBar, new Label("Enrollments List"), table, buttonBar);
+        setMainContent(layout);
+    }
+
+    // Helper to delete a directory recursively
+    private void deleteDirectory(File dir) {
+        if (dir.isDirectory()) {
+            File[] children = dir.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteDirectory(child);
+                }
+            }
+        }
+        dir.delete();
+    }
+
+    private void enrollStudent(String selectedTerm, Runnable refreshTable) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Search Student to Enroll");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+
+        VBox root = new VBox(15);
+        root.setPadding(new Insets(20));
+        root.setStyle("-fx-background-color: white;");
+
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search by ID or Name...");
+        searchField.setPrefWidth(300);
+        searchField.setStyle("-fx-font-size: 14px;");
+
+        TableView<String[]> table = new TableView<>();
+        table.setPrefHeight(200);
+        table.setPrefWidth(700);
+        String[] headers = {"ID", "Name", "Suffix", "Email", "Gender", "Address", "Contact", "Program", "Year", "DateEnrolled"};
+        for (int i = 0; i < headers.length; i++) {
+            final int idx = i;
+            TableColumn<String[], String> col = new TableColumn<>(headers[i]);
+            col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[idx]));
+            col.setPrefWidth(90);
+            table.getColumns().add(col);
+        }
+
+        ObservableList<String[]> students = FXCollections.observableArrayList();
+        File studentsFile = new File("students.csv");
+        if (studentsFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(studentsFile))) {
+                br.readLine(); // skip header
+                br.lines()
+                        .map(line -> line.split(",", -1))
+                        .forEach(students::add);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        FilteredList<String[]> filtered = new FilteredList<>(students, s -> true);
+        table.setItems(filtered);
+
+        searchField.textProperty().addListener((obs, old, val) -> {
+            String search = val.toLowerCase();
+            filtered.setPredicate(arr -> arr[0].toLowerCase().contains(search) || arr[1].toLowerCase().contains(search));
+        });
+
+        Button enrollBtn = new Button("Enroll Student");
+        enrollBtn.setStyle("-fx-font-size: 14px; -fx-padding: 8 24 8 24;");
+        enrollBtn.setDisable(true);
+
+        final String[] selectedStudent = {null};
+
+        table.setRowFactory(tv -> {
+            TableRow<String[]> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty()) {
+                    selectedStudent[0] = row.getItem()[0];
+                    enrollBtn.setDisable(false);
+                }
+            });
+            return row;
+        });
+
+        enrollBtn.setOnAction(e -> {
+            if (selectedStudent[0] != null && selectedTerm != null) {
+                String[] student = students.stream().filter(s -> s[0].equals(selectedStudent[0])).findFirst().orElse(null);
+                if (student != null) {
+                    dialog.close();
+                    javafx.application.Platform.runLater(() -> showStudentEnrollmentDialog(student, selectedTerm, refreshTable));
+                }
+            }
+        });
+
+        root.getChildren().addAll(
+                new Label("Search and Select Student"),
+                searchField,
+                table,
+                enrollBtn
+        );
+
+        Scene scene = new Scene(root, 750, 400);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
+    private void showStudentEnrollmentDialog(String[] student, String selectedTerm, Runnable refreshTable) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Manage Enrollment for " + student[1]);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+
+        VBox root = new VBox(18);
+        root.setPadding(new Insets(24));
+        root.setStyle("-fx-background-color: #f8fafc;");
+
+        Label titleLabel = new Label("Student Enrollment");
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        Label studentLabel = new Label("Student: " + student[1] + " (" + student[0] + ")");
+        Label programLabel = new Label("Program: " + student[7]);
+
+        ComboBox<String> termBox = new ComboBox<>();
+        termBox.setPromptText("Select Term");
+        termBox.setPrefWidth(260);
+
+        File termsFile = new File("terms.csv");
+        ObservableList<String[]> availableCourses = FXCollections.observableArrayList();
+        ObservableList<String[]> enrolledCourses = FXCollections.observableArrayList();
+        FilteredList<String[]> filteredAvailableCourses = new FilteredList<>(availableCourses, ac -> true);
+
+        // --- Collect all courses already enrolled in any term for this student ---
+        java.util.Set<String> allEnrolledCourseCodes = new java.util.HashSet<>();
+        if (student[0] != null) {
+            File studentDir = new File("students/" + student[0]);
+            if (studentDir.exists() && studentDir.isDirectory()) {
+                File[] termDirs = studentDir.listFiles(File::isDirectory);
+                if (termDirs != null) {
+                    for (File termDir : termDirs) {
+                        File coursesFile = new File(termDir, "courses.csv");
+                        if (coursesFile.exists()) {
+                            try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                                br.readLine(); // skip header
+                                br.lines().forEach(line -> {
+                                    String[] parts = line.split(",", -1);
+                                    if (parts.length > 1) {
+                                        allEnrolledCourseCodes.add(parts[0]);
+                                    }
+                                });
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Collect all enrollments from enrollments.csv for duplicate check ---
+        java.util.Set<String> allEnrollmentKeys = new java.util.HashSet<>();
+        File enrollmentsFile = new File("enrollments.csv");
+        if (enrollmentsFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
+                br.readLine(); // skip header
+                br.lines().forEach(line -> {
+                    String[] arr = line.split(",", -1);
+                    if (arr.length >= 7) {
+                        allEnrollmentKeys.add(arr[0] + "," + arr[5] + "," + arr[6]);
+                    }
+                });
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        // Helper to save enrollments for a term
+        Runnable saveEnrollments = () -> {
+            String term = termBox.getValue();
+            if (student != null && term != null) {
+                File enrolledFile = new File("students/" + student[0] + "/" + term + "/courses.csv");
+                enrolledFile.getParentFile().mkdirs();
+                try (java.io.FileWriter fw = new java.io.FileWriter(enrolledFile, false)) {
+                    fw.write("Code,Name,Units\n");
+                    for (String[] course : enrolledCourses) {
+                        // course[2] is units
+                        fw.write(course[0] + "," + course[1] + "," + (course.length > 2 ? course[2] : "") + "\n");
+                    }
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+                java.util.List<String> allLines = new java.util.ArrayList<>();
+                // Read all lines, skip header
+                if (enrollmentsFile.exists()) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
+                        String header = br.readLine();
+                        if (header != null) allLines.add(header);
+                        br.lines().forEach(allLines::add);
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                // Remove all lines for this student and this term only
+                String sid = student[0];
+                java.util.List<String> filtered = new java.util.ArrayList<>();
+                String header = allLines.isEmpty() ? "Student ID,Student Name,Program,Year,Status,Term" : allLines.get(0);
+                filtered.add(header);
+                for (int i = 1; i < allLines.size(); i++) {
+                    String line = allLines.get(i);
+                    String[] arr = line.split(",", -1);
+                    if (arr.length >= 6) {
+                        if (!(arr[0].equals(sid) && arr[5].equals(term))) {
+                            filtered.add(line);
+                        }
+                    } else if (!line.trim().isEmpty()) {
+                        filtered.add(line);
+                    }
+                }
+                // Add new enrollment for this student for the current term only
+                filtered.add(sid + "," + student[1] + "," + student[7] + "," + student[8] + ",Enrolled," + term);
+                // Write back to enrollments.csv
+                try (java.io.FileWriter fw = new java.io.FileWriter(enrollmentsFile, false)) {
+                    for (String line : filtered) {
+                        fw.write(line + "\n");
+                    }
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        };
+
+        // Helper to reload available/enrolled courses for a term
+        Runnable reloadCoursesForTerm = () -> {
+            String newTerm = termBox.getValue();
+            availableCourses.clear();
+            enrolledCourses.clear();
+            // Always re-collect allEnrolledCodes for this student (across all terms)
+            java.util.Set<String> allEnrolledCodes = new java.util.HashSet<>();
+            if (student[0] != null) {
+                File studentDir = new File("students/" + student[0]);
+                if (studentDir.exists() && studentDir.isDirectory()) {
+                    File[] termDirs = studentDir.listFiles(File::isDirectory);
+                    if (termDirs != null) {
+                        for (File termDir : termDirs) {
+                            File coursesFile = new File(termDir, "courses.csv");
+                            if (coursesFile.exists()) {
+                                try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                                    br.readLine(); // skip header
+                                    br.lines().forEach(line -> {
+                                        String[] parts = line.split(",", -1);
+                                        if (parts.length > 1) {
+                                            allEnrolledCodes.add(parts[0]);
+                                        }
+                                    });
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Load available courses, but filter out those already enrolled in any term
+            if (student[7] != null && newTerm != null) {
+                File progFile = new File("programs/" + student[7] + ".csv");
+                if (progFile.exists()) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(progFile))) {
+                        br.lines().forEach(line -> {
+                            String[] parts = line.split(",", -1);
+                            if (parts.length > 2) {
+                                if (!allEnrolledCodes.contains(parts[0])) {
+                                    availableCourses.add(new String[]{parts[0], parts[1], parts[2]});
+                                }
+                            }
+                        });
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            // Load enrolled courses for the selected term from students/{studentid}/{term}/courses.csv
+            if (student[0] != null && newTerm != null) {
+                File enrolledFile = new File("students/" + student[0] + "/" + newTerm + "/courses.csv");
+                if (enrolledFile.exists()) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(enrolledFile))) {
+                        br.readLine(); // skip header
+                        br.lines().forEach(line -> {
+                            String[] parts = line.split(",", -1);
+                            if (parts.length > 2) {
+                                enrolledCourses.add(new String[]{parts[0], parts[1], parts[2]});
+                            } else if (parts.length > 1) {
+                                enrolledCourses.add(new String[]{parts[0], parts[1], ""});
+                            }
+                        });
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+
+        // Load terms and set up initial state
+        if (termsFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(termsFile))) {
+                java.util.List<String> terms = new java.util.ArrayList<>();
+                br.lines().forEach(terms::add);
+                termBox.getItems().addAll(terms);
+                if (selectedTerm != null && terms.contains(selectedTerm)) {
+                    termBox.setValue(selectedTerm);
+                } else if (!terms.isEmpty()) {
+                    termBox.setValue(terms.get(terms.size() - 1)); // set latest as default
+                }
+                reloadCoursesForTerm.run();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        TableView<String[]> availableCoursesTable = new TableView<>();
+        availableCoursesTable.setPrefHeight(260);
+        availableCoursesTable.setPrefWidth(350);
+        TableColumn<String[], String> acCodeCol = new TableColumn<>("Code");
+        acCodeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
+        acCodeCol.setPrefWidth(80);
+        TableColumn<String[], String> acNameCol = new TableColumn<>("Name");
+        acNameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
+        acNameCol.setPrefWidth(160);
+        TableColumn<String[], String> acUnitsCol = new TableColumn<>("Units");
+        acUnitsCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 2 ? data.getValue()[2] : ""));
+        acUnitsCol.setPrefWidth(60);
+        availableCoursesTable.getColumns().addAll(acCodeCol, acNameCol, acUnitsCol);
+
+        TableView<String[]> enrolledCoursesTable = new TableView<>();
+        enrolledCoursesTable.setPrefHeight(260);
+        enrolledCoursesTable.setPrefWidth(350);
+        TableColumn<String[], String> ecCodeCol = new TableColumn<>("Code");
+        ecCodeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
+        ecCodeCol.setPrefWidth(80);
+        TableColumn<String[], String> ecNameCol = new TableColumn<>("Name");
+        ecNameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
+        ecNameCol.setPrefWidth(160);
+        TableColumn<String[], String> ecUnitsCol = new TableColumn<>("Units");
+        ecUnitsCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 2 ? data.getValue()[2] : ""));
+        ecUnitsCol.setPrefWidth(60);
+        enrolledCoursesTable.getColumns().addAll(ecCodeCol, ecNameCol, ecUnitsCol);
+
+        availableCoursesTable.setItems(filteredAvailableCourses);
+        enrolledCoursesTable.setItems(enrolledCourses);
+
+        availableCoursesTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        enrolledCoursesTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+
+        // When term changes, just reload, do not save
+        termBox.valueProperty().addListener((obs, oldTerm, newTerm) -> {
+            reloadCoursesForTerm.run();
+            enrolledCoursesTable.refresh(); // Ensure UI updates when term changes
+        });
+
+        Button addCourseBtn = new Button("Add →");
+        addCourseBtn.setOnAction(e -> {
+            ObservableList<String[]> selected = availableCoursesTable.getSelectionModel().getSelectedItems();
+            for (String[] course : selected) {
+                boolean exists = enrolledCourses.stream().anyMatch(c -> c[0].equals(course[0]));
+                if (!exists) {
+                    enrolledCourses.add(new String[]{course[0], course[1], course.length > 2 ? course[2] : ""});
+                }
+            }
+            // Only remove from availableCourses if it is now enrolled in the current term
+            availableCourses.removeIf(ac -> enrolledCourses.stream().anyMatch(ec -> ec[0].equals(ac[0])));
+            saveEnrollments.run();
+        });
+
+        Button removeCourseBtn = new Button("← Remove");
+        removeCourseBtn.setOnAction(e -> {
+            ObservableList<String[]> selected = FXCollections.observableArrayList(enrolledCoursesTable.getSelectionModel().getSelectedItems());
+            for (String[] course : selected) {
+                // Only add back to availableCourses if not enrolled in any other term
+                boolean enrolledInOtherTerm = false;
+                for (String[] ec : enrolledCourses) {
+                    if (ec[0].equals(course[0]) && !ec[2].isEmpty()) {
+                        enrolledInOtherTerm = true;
+                        break;
+                    }
+                }
+                if (!enrolledInOtherTerm) {
+                    availableCourses.add(new String[]{course[0], course[1], course.length > 2 ? course[2] : ""});
+                }
+                enrolledCourses.remove(course);
+            }
+            saveEnrollments.run();
+            // Update available courses after removal
+            reloadCoursesForTerm.run();
+            availableCoursesTable.refresh();
+        });
+
+        Button enrollBtn = new Button("Done");
+        enrollBtn.setOnAction(e -> {
+            saveEnrollments.run();
+            dialog.close();
+            onEnrollmentsClick(); // Refresh the Enrollments table after closing
+        });
+
+        Button generateGsaBtn = new Button("Generate GSA");
+        generateGsaBtn.setOnAction(e -> {
+            try {
+                // Generate GSA PDF
+                String pdfPath = "students/" + student[0] + "/" + termBox.getValue() + "/GSA.pdf";
+                new File("students/" + student[0] + "/" + termBox.getValue()).mkdirs();
+                GsaPdfGenerator.generateGsaPdf(
+                        pdfPath,
+                        getClass().getResourceAsStream("images/logo.png"),
+                        "SmartClass University",
+                        student,
+                        termBox.getValue(),
+                        new java.util.ArrayList<>(enrolledCourses)
+                );
+                // Preview PDF (open with system viewer)
+                java.awt.Desktop.getDesktop().open(new File(pdfPath));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Failed to generate or preview GSA PDF: " + ex.getMessage());
+                alert.showAndWait();
+            }
+        });
+
+        VBox leftBox = new VBox(8, new Label("Available Courses"), availableCoursesTable, addCourseBtn);
+        VBox rightBox = new VBox(8, new Label("Enrolled Courses"), enrolledCoursesTable, removeCourseBtn);
+        leftBox.setAlignment(Pos.TOP_CENTER);
+        rightBox.setAlignment(Pos.TOP_CENTER);
+        HBox tablesBox = new HBox(24, leftBox, rightBox);
+        tablesBox.setAlignment(Pos.CENTER);
+
+        root.getChildren().addAll(
+                titleLabel,
+                studentLabel,
+                programLabel,
+                new Label("Term:"),
+                termBox,
+                tablesBox,
+                enrollBtn,
+                generateGsaBtn
+        );
+
+        Scene scene = new Scene(root, 800, 600);
+        dialog.setScene(scene);
+        dialog.sizeToScene();
+        dialog.setResizable(false);
+        dialog.showAndWait();
+    }
+
+
+    @FXML private void onLogoutClick() { System.exit(0); }
+}
+
+

@@ -1,0 +1,33 @@
+.nav-button {
+    -fx-background-color: #3c6382;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+}
+
+.nav-button:hover {
+    -fx-background-color: #60a3bc;
+}
+
+.logout-button {
+    -fx-background-color: #e55039;
+}
+
+.logout-button:hover {
+    -fx-background-color: #eb2f06;
+}
+
+.side-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #2f3640;
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 8 12;
+    -fx-background-radius: 5;
+}
+
+.side-button:hover {
+    -fx-background-color: #dcdde1;
+}
