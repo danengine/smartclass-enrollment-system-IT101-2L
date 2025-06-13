@@ -1,5 +1,0 @@
-program,course_code,course_name,prerequisites,total_enrolled
-BSCS,IT101-2,Intro to Computing,None,58
-BSCS,CS102,Data Structures,IT101-2,45
-BSIS,IS101,IS Fundamentals,None,40
-BSIS,IS102,System Analysis,IS101,38

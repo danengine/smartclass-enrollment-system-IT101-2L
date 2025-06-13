@@ -12,6 +12,7 @@ module com.example.smartclass {
     requires org.apache.commons.io;
     requires java.desktop;
     requires org.json;
+    requires okhttp3;
 
     opens com.example.smartclass to javafx.fxml;
     exports com.example.smartclass;

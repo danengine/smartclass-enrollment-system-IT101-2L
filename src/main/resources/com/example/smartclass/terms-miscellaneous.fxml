@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.example.smartclass.AdminDashboardController">
+    <center>
+        <HBox spacing="24" alignment="CENTER" BorderPane.alignment="CENTER">
+            <!-- Terms Section -->
+            <VBox spacing="8" prefWidth="220">
+                <Label text="Terms" />
+                <ListView fx:id="termsList" prefWidth="200" prefHeight="260" />
+                <HBox spacing="5">
+                    <TextField fx:id="newTermField" promptText="Add term" />
+                    <Button text="Add" onAction="#onAddTerm" />
+                    <Button text="Delete" onAction="#onDeleteTerm" />
+                </HBox>
+                <Button text="Save" onAction="#onSaveTerms" />
+            </VBox>
+            <!-- Miscellaneous Section -->
+            <VBox spacing="8" prefWidth="300">
+                <Label text="Miscellaneous Fees" />
+                <TableView fx:id="miscTable" prefHeight="260">
+                    <columns>
+                        <TableColumn fx:id="feeCol" text="Fee Name" prefWidth="160" />
+                        <TableColumn fx:id="amtCol" text="Amount" prefWidth="80" />
+                    </columns>
+                </TableView>
+                <HBox spacing="5">
+                    <TextField fx:id="feeField" promptText="Fee Name" />
+                    <TextField fx:id="amtField" promptText="Amount" />
+                    <Button text="Add" onAction="#onAddFee" />
+                    <Button text="Delete" onAction="#onDeleteFee" />
+                </HBox>
+                <Button text="Save" onAction="#onSaveFees" />
+            </VBox>
+        </HBox>
+    </center>
+    <padding>
+        <Insets top="24" right="24" bottom="24" left="24" />
+    </padding>
+</BorderPane>
+

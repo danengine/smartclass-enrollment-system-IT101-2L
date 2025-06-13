@@ -11,6 +11,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -19,10 +20,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TextFieldTableCell;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
@@ -33,10 +31,9 @@ import javafx.util.converter.IntegerStringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 
 public class AdminDashboardController {
@@ -48,7 +45,7 @@ public class AdminDashboardController {
         FadeTransition fadeOut = new FadeTransition(Duration.millis(200), mainContent);
         fadeOut.setFromValue(1);
         fadeOut.setToValue(0);
-        fadeOut.setOnFinished(event -> {
+        fadeOut.setOnFinished(_ -> {
             mainContent.getChildren().setAll(newContent);
             FadeTransition fadeIn = new FadeTransition(Duration.millis(200), mainContent);
             fadeIn.setFromValue(0);
@@ -130,7 +127,7 @@ public class AdminDashboardController {
         Duration duration = Duration.seconds(1);
         for (int i = 0; i <= steps; i++) {
             double frac = i / (double) steps;
-            timeline.getKeyFrames().add(new KeyFrame(duration.multiply(frac), e -> {
+            timeline.getKeyFrames().add(new KeyFrame(duration.multiply(frac), _ -> {
                 ccis.setValue(frac * ccisTarget);
                 cba.setValue(frac * cbaTarget);
                 cea.setValue(frac * ceaTarget);
@@ -292,7 +289,7 @@ public class AdminDashboardController {
                 if (btn == ButtonType.OK) {
                     int units = 0;
                     try { units = Integer.parseInt(unitsField.getText().trim()); } catch (Exception ignored) {}
-                    Course course = new Course(codeField.getText(), nameField.getText(), "", units);
+                    Course course = new Course(codeField.getText(), nameField.getText(), "", units, "N/A");
                     Database.addCourseToProgram(program, course);
                     return course;
                 }
@@ -424,7 +421,7 @@ public class AdminDashboardController {
                     if (!exists) {
                         int units = 0;
                         try { units = Integer.parseInt(row[2]); } catch (Exception ignored) {}
-                        courseList.add(new Course(row[0], row[1], "", units));
+                        courseList.add(new Course(row[0], row[1], "", units, "N/A"));
                     }
                 }
                 uploadStage.close();
@@ -807,10 +804,9 @@ public class AdminDashboardController {
                 File enrolledFile = new File("students/" + student[0] + "/" + term + "/courses.csv");
                 enrolledFile.getParentFile().mkdirs();
                 try (java.io.FileWriter fw = new java.io.FileWriter(enrolledFile, false)) {
-                    fw.write("Code,Name,Units\n");
+                    fw.write("Code,Name,Units,Section,Schedule\n");
                     for (String[] course : enrolledCourses) {
-                        // course[2] is units
-                        fw.write(course[0] + "," + course[1] + "," + (course.length > 2 ? course[2] : "") + "\n");
+                        fw.write(course[0] + "," + course[1] + "," + (course.length > 2 ? course[2] : "") + "," + (course.length > 3 ? course[3] : "") + "," + (course.length > 4 ? course[4] : "") + "\n");
                     }
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -860,7 +856,6 @@ public class AdminDashboardController {
             String newTerm = termBox.getValue();
             availableCourses.clear();
             enrolledCourses.clear();
-            // Always re-collect allEnrolledCodes for this student (across all terms)
             java.util.Set<String> allEnrolledCodes = new java.util.HashSet<>();
             if (student[0] != null) {
                 File studentDir = new File("students/" + student[0]);
@@ -875,7 +870,8 @@ public class AdminDashboardController {
                                     br.lines().forEach(line -> {
                                         String[] parts = line.split(",", -1);
                                         if (parts.length > 1) {
-                                            allEnrolledCodes.add(parts[0]);
+                                            // Use code:section as unique key
+                                            allEnrolledCodes.add(parts[0] + (parts.length > 3 ? (":" + parts[3]) : ""));
                                         }
                                     });
                                 } catch (IOException e) {
@@ -886,22 +882,68 @@ public class AdminDashboardController {
                     }
                 }
             }
-            // Load available courses, but filter out those already enrolled in any term
+            // Load available courses from program file, but only show those with sections in courses.csv for this term
             if (student[7] != null && newTerm != null) {
                 File progFile = new File("programs/" + student[7] + ".csv");
+                File mainCoursesFile = new File("courses.csv");
+                List<String[]> allSections = new ArrayList<>();
+                if (mainCoursesFile.exists()) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(mainCoursesFile))) {
+                        br.readLine(); // skip header
+                        br.lines().forEach(line -> {
+                            String[] parts = line.split(",", -1);
+                            // Program, Section, CourseCode, CourseName, Units, Term, Schedule
+                            if (parts.length >= 7 && parts[5].equals(newTerm) && student[7].equals(parts[0])) {
+                                allSections.add(parts);
+                            }
+                        });
+                    } catch (IOException e) { e.printStackTrace(); }
+                }
+                // Collect all enrolled course codes in any term for this student
+                java.util.Set<String> allEnrolledCourseCodesAnyTerm = new java.util.HashSet<>();
+                if (student[0] != null) {
+                    File studentDir = new File("students/" + student[0]);
+                    if (studentDir.exists() && studentDir.isDirectory()) {
+                        File[] termDirs = studentDir.listFiles(File::isDirectory);
+                        if (termDirs != null) {
+                            for (File termDir : termDirs) {
+                                File coursesFile = new File(termDir, "courses.csv");
+                                if (coursesFile.exists()) {
+                                    try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                                        br.readLine(); // skip header
+                                        br.lines().forEach(line -> {
+                                            String[] parts = line.split(",", -1);
+                                            if (parts.length > 0) {
+                                                allEnrolledCourseCodesAnyTerm.add(parts[0]);
+                                            }
+                                        });
+                                    } catch (IOException e) { e.printStackTrace(); }
+                                }
+                            }
+                        }
+                    }
+                }
                 if (progFile.exists()) {
                     try (BufferedReader br = new BufferedReader(new FileReader(progFile))) {
                         br.lines().forEach(line -> {
-                            String[] parts = line.split(",", -1);
-                            if (parts.length > 2) {
-                                if (!allEnrolledCodes.contains(parts[0])) {
-                                    availableCourses.add(new String[]{parts[0], parts[1], parts[2]});
+                            String[] progParts = line.split(",", -1);
+                            if (progParts.length > 0) {
+                                String code = progParts[0];
+                                // If already enrolled in any term, skip all sections of this course
+                                if (allEnrolledCourseCodesAnyTerm.contains(code)) return;
+                                // For each section in allSections, if code matches exactly, add as available if not already enrolled in this section
+                                for (String[] section : allSections) {
+                                    // Only match exact course codes (CS101 and CS101L are different)
+                                    if (section[2].equals(code)) {
+                                        String sectionKey = section[2] + ":" + section[1];
+                                        if (!allEnrolledCodes.contains(sectionKey)) {
+                                            availableCourses.add(new String[]{section[2], section[3], section[4], section[1], section[6]});
+                                        }
+                                    }
                                 }
                             }
                         });
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    } catch (IOException e) { e.printStackTrace(); }
                 }
             }
             // Load enrolled courses for the selected term from students/{studentid}/{term}/courses.csv
@@ -912,10 +954,8 @@ public class AdminDashboardController {
                         br.readLine(); // skip header
                         br.lines().forEach(line -> {
                             String[] parts = line.split(",", -1);
-                            if (parts.length > 2) {
-                                enrolledCourses.add(new String[]{parts[0], parts[1], parts[2]});
-                            } else if (parts.length > 1) {
-                                enrolledCourses.add(new String[]{parts[0], parts[1], ""});
+                            if (parts.length > 4) {
+                                enrolledCourses.add(new String[]{parts[0], parts[1], parts[2], parts[3], parts[4]});
                             }
                         });
                     } catch (IOException e) {
@@ -944,7 +984,7 @@ public class AdminDashboardController {
 
         TableView<String[]> availableCoursesTable = new TableView<>();
         availableCoursesTable.setPrefHeight(260);
-        availableCoursesTable.setPrefWidth(350);
+        availableCoursesTable.setPrefWidth(500);
         TableColumn<String[], String> acCodeCol = new TableColumn<>("Code");
         acCodeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
         acCodeCol.setPrefWidth(80);
@@ -954,11 +994,17 @@ public class AdminDashboardController {
         TableColumn<String[], String> acUnitsCol = new TableColumn<>("Units");
         acUnitsCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 2 ? data.getValue()[2] : ""));
         acUnitsCol.setPrefWidth(60);
-        availableCoursesTable.getColumns().addAll(acCodeCol, acNameCol, acUnitsCol);
+        TableColumn<String[], String> acSectionCol = new TableColumn<>("Section");
+        acSectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 3 ? data.getValue()[3] : ""));
+        acSectionCol.setPrefWidth(80);
+        TableColumn<String[], String> acScheduleCol = new TableColumn<>("Schedule");
+        acScheduleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 4 ? data.getValue()[4] : ""));
+        acScheduleCol.setPrefWidth(120);
+        availableCoursesTable.getColumns().setAll(acCodeCol, acNameCol, acUnitsCol, acSectionCol, acScheduleCol);
 
         TableView<String[]> enrolledCoursesTable = new TableView<>();
         enrolledCoursesTable.setPrefHeight(260);
-        enrolledCoursesTable.setPrefWidth(350);
+        enrolledCoursesTable.setPrefWidth(500);
         TableColumn<String[], String> ecCodeCol = new TableColumn<>("Code");
         ecCodeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
         ecCodeCol.setPrefWidth(80);
@@ -968,7 +1014,13 @@ public class AdminDashboardController {
         TableColumn<String[], String> ecUnitsCol = new TableColumn<>("Units");
         ecUnitsCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 2 ? data.getValue()[2] : ""));
         ecUnitsCol.setPrefWidth(60);
-        enrolledCoursesTable.getColumns().addAll(ecCodeCol, ecNameCol, ecUnitsCol);
+        TableColumn<String[], String> ecSectionCol = new TableColumn<>("Section");
+        ecSectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 3 ? data.getValue()[3] : ""));
+        ecSectionCol.setPrefWidth(80);
+        TableColumn<String[], String> ecScheduleCol = new TableColumn<>("Schedule");
+        ecScheduleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 4 ? data.getValue()[4] : ""));
+        ecScheduleCol.setPrefWidth(120);
+        enrolledCoursesTable.getColumns().setAll(ecCodeCol, ecNameCol, ecUnitsCol, ecSectionCol, ecScheduleCol);
 
         availableCoursesTable.setItems(filteredAvailableCourses);
         enrolledCoursesTable.setItems(enrolledCourses);
@@ -986,14 +1038,18 @@ public class AdminDashboardController {
         addCourseBtn.setOnAction(e -> {
             ObservableList<String[]> selected = availableCoursesTable.getSelectionModel().getSelectedItems();
             for (String[] course : selected) {
-                boolean exists = enrolledCourses.stream().anyMatch(c -> c[0].equals(course[0]));
+                boolean exists = enrolledCourses.stream().anyMatch(c -> c[0].equals(course[0]) && c.length > 3 && c[3].equals(course[3]));
                 if (!exists) {
-                    enrolledCourses.add(new String[]{course[0], course[1], course.length > 2 ? course[2] : ""});
+                    // Add with section and schedule
+                    enrolledCourses.add(new String[]{course[0], course[1], course.length > 2 ? course[2] : "", course.length > 3 ? course[3] : "", course.length > 4 ? course[4] : ""});
                 }
             }
-            // Only remove from availableCourses if it is now enrolled in the current term
-            availableCourses.removeIf(ac -> enrolledCourses.stream().anyMatch(ec -> ec[0].equals(ac[0])));
+            // Remove from availableCourses if now enrolled in this term
+            availableCourses.removeIf(ac -> enrolledCourses.stream().anyMatch(ec -> ec[0].equals(ac[0]) && ec.length > 3 && ec[3].equals(ac[3])));
             saveEnrollments.run();
+            // Reload available courses after adding
+            reloadCoursesForTerm.run();
+            availableCoursesTable.refresh();
         });
 
         Button removeCourseBtn = new Button("← Remove");
@@ -1049,6 +1105,135 @@ public class AdminDashboardController {
             }
         });
 
+        Button visualizeBtn = new Button("Visualize Schedule");
+        visualizeBtn.setOnAction(e -> {
+            Stage schedDialog = new Stage();
+            schedDialog.setTitle("Schedule Visualization");
+            schedDialog.initModality(Modality.APPLICATION_MODAL);
+
+            // Days and time slots
+            String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+            int startHour = 7, endHour = 21; // 7:00 to 21:00 (8:00 PM) for a bigger frame
+            int numRows = endHour - startHour;
+
+            GridPane grid = new GridPane();
+            grid.setPadding(new Insets(16));
+            grid.setHgap(4);
+            grid.setVgap(4);
+            grid.setStyle("-fx-background-color: white;");
+
+            // Header row
+            grid.add(new Label("Time/Day"), 0, 0);
+            for (int d = 0; d < days.length; d++) {
+                Label dayLabel = new Label(days[d]);
+                dayLabel.setStyle("-fx-font-weight: bold;");
+                grid.add(dayLabel, d + 1, 0);
+            }
+            // Time labels (24-hour format)
+            for (int h = 0; h < numRows; h++) {
+                int hour = startHour + h;
+                String timeLabel = String.format("%02d:00-%02d:00", hour, hour + 1);
+                grid.add(new Label(timeLabel), 0, h + 1);
+            }
+            // Fill grid with enrolled courses
+            Label[][] cellMatrix = new Label[numRows][days.length];
+            int[][] cellCount = new int[numRows][days.length];
+            // First pass: count how many courses occupy each cell
+            for (String[] course : enrolledCourses) {
+                if (course.length < 5) continue;
+                String code = course[0];
+                String section = course[3];
+                String sched = course[4];
+                if (sched == null || sched.isEmpty()) continue;
+                String[] parts = sched.split(" ", 3);
+                if (parts.length < 3) continue;
+                String timeRange = parts[0];
+                String daysStr = parts[2];
+                String[] schedDays = daysStr.split("/");
+                String[] times = timeRange.split("-");
+                if (times.length != 2) continue;
+                int start = Integer.parseInt(times[0].split(":")[0]);
+                int end = Integer.parseInt(times[1].split(":")[0]);
+                for (String d : schedDays) {
+                    d = d.trim();
+                    for (int col = 0; col < days.length; col++) {
+                        if (days[col].equalsIgnoreCase(d)) {
+                            for (int row = start - startHour; row < end - startHour; row++) {
+                                if (row >= 0 && row < numRows) {
+                                    cellCount[row][col]++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Second pass: fill grid and color conflicts
+            for (String[] course : enrolledCourses) {
+                if (course.length < 5) continue;
+                String code = course[0];
+                String section = course[3];
+                String sched = course[4];
+                if (sched == null || sched.isEmpty()) continue;
+                String[] parts = sched.split(" ", 3);
+                if (parts.length < 3) continue;
+                String timeRange = parts[0];
+                String room = parts[1].replaceAll("[()]", "");
+                String daysStr = parts[2];
+                String[] schedDays = daysStr.split("/");
+                String[] times = timeRange.split("-");
+                if (times.length != 2) continue;
+                int start = Integer.parseInt(times[0].split(":")[0]);
+                int end = Integer.parseInt(times[1].split(":")[0]);
+                for (String d : schedDays) {
+                    d = d.trim();
+                    for (int col = 0; col < days.length; col++) {
+                        if (days[col].equalsIgnoreCase(d)) {
+                            for (int row = start - startHour; row < end - startHour; row++) {
+                                if (row >= 0 && row < numRows) {
+                                    String labelText = code + " (" + section + ")\n" + room;
+                                    Label cell = new Label(labelText);
+                                    cell.setWrapText(true);
+                                    if (cellCount[row][col] > 1) {
+                                        cell.setStyle("-fx-background-color: #ffcccc; -fx-border-color: #e57373; -fx-padding: 2; -fx-font-size: 11px;");
+                                    } else {
+                                        cell.setStyle("-fx-background-color: #e0f7fa; -fx-border-color: #b2ebf2; -fx-padding: 2; -fx-font-size: 11px;");
+                                    }
+                                    grid.add(cell, col + 1, row + 1);
+                                    cellMatrix[row][col] = cell;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Fill empty cells with a light gray box for design
+            for (int row = 0; row < numRows; row++) {
+                for (int col = 0; col < days.length; col++) {
+                    if (cellMatrix[row][col] == null) {
+                        Label emptyCell = new Label("");
+                        emptyCell.setMinHeight(40);
+                        emptyCell.setMinWidth(110);
+                        emptyCell.setPrefHeight(48);
+                        emptyCell.setPrefWidth(110);
+                        emptyCell.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-padding: 2;");
+                        grid.add(emptyCell, col + 1, row + 1);
+                    } else {
+                        // Also set fixed size for course cells
+                        cellMatrix[row][col].setMinHeight(40);
+                        cellMatrix[row][col].setMinWidth(110);
+                        cellMatrix[row][col].setPrefHeight(48);
+                        cellMatrix[row][col].setPrefWidth(110);
+                    }
+                }
+            }
+            ScrollPane scroll = new ScrollPane(grid);
+            scroll.setFitToWidth(true);
+            // Make the window bigger to fit more rows (height and width)
+            Scene schedScene = new Scene(scroll, 900, 650); // Reduced size for better fit
+            schedDialog.setScene(schedScene);
+            schedDialog.showAndWait();
+        });
+
         VBox leftBox = new VBox(8, new Label("Available Courses"), availableCoursesTable, addCourseBtn);
         VBox rightBox = new VBox(8, new Label("Enrolled Courses"), enrolledCoursesTable, removeCourseBtn);
         leftBox.setAlignment(Pos.TOP_CENTER);
@@ -1064,7 +1249,8 @@ public class AdminDashboardController {
                 termBox,
                 tablesBox,
                 enrollBtn,
-                generateGsaBtn
+                generateGsaBtn,
+                visualizeBtn
         );
 
         Scene scene = new Scene(root, 800, 600);
@@ -1074,8 +1260,15 @@ public class AdminDashboardController {
         dialog.showAndWait();
     }
 
+    @FXML
+    private void onTermsClick() {
+        setMainContent(Settings.OpenSettings());
+    }
+
+    public void onCoursesClick(ActionEvent actionEvent) {
+        setMainContent(Sections.SectionsOpen());
+    }
 
     @FXML private void onLogoutClick() { System.exit(0); }
 }
-
 

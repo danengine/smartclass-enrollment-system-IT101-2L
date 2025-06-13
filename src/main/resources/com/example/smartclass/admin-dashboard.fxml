@@ -50,8 +50,10 @@
 
             <Button onAction="#onDashboardClick" styleClass="side-button" text="Dashboard" />
             <Button onAction="#onManageStudentsClick" styleClass="side-button" text="Students" />
+            <Button onAction="#onCoursesClick" styleClass="side-button" text="Courses" />
             <Button onAction="#onManageProgramsClick" styleClass="side-button" text="Programs" />
             <Button onAction="#onEnrollmentsClick" styleClass="side-button" text="Enrollments" />
+            <Button onAction="#onTermsClick" styleClass="side-button" text="Settings" />
 
             <Region VBox.vgrow="ALWAYS" />
             <Separator />
