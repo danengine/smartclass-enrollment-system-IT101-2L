@@ -136,25 +136,20 @@ public class Database {
 
     public static void addProgram(String programName) {
         try {
-            // Ensure the directory exists
             File dir = new File("programs");
             if (!dir.exists()) {
                 dir.mkdirs();
             }
 
-            // Create CSV file for the program
             File programFile = new File(dir, programName + ".csv");
 
             if (programFile.exists()) {
                 System.out.println("Program already exists: " + programName);
-                return; // Or throw an exception if preferred
+                return;
             }
 
-            // Create empty file
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(programFile))) {
-                // Optionally, write header line (commented out)
-                // writer.write("CourseCode,CourseName,Prerequisites,TotalEnrolled");
-                // writer.newLine();
+
             }
 
             System.out.println("Program added: " + programName);

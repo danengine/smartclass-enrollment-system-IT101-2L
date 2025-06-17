@@ -32,8 +32,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 public class AdminDashboardController {
@@ -67,75 +66,155 @@ public class AdminDashboardController {
     }
 
     private void showDashboard() {
-        // Start with 0s for animation
-        ChartData ccis = new ChartData("CCIS", 0, Tile.BLUE);
-        ChartData cba  = new ChartData("CBA", 0, Tile.GREEN);
-        ChartData cea  = new ChartData("CEA", 0, Tile.ORANGE);
-        ChartData chm  = new ChartData("CHM", 0, Tile.RED);
+        // Read all students
+        Set<String> allStudentIds = new HashSet<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader("students.csv"))) {
+            String line = reader.readLine(); // skip header
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length < 1) continue;
+                allStudentIds.add(parts[0].trim());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        double ccisTarget = 200;
-        double cbaTarget  = 40;
-        double ceaTarget  = 20;
-        double chmTarget  = 15;
-        double instructorsTarget = 14;
+        // Read enrollments.csv and collect enrolled student IDs
+        Set<String> enrolledIds = new HashSet<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader("enrollments.csv"))) {
+            String line = reader.readLine(); // skip header
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length < 1) continue;
+                enrolledIds.add(parts[0].trim());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        // Donut chart tile
+        int totalEnrolled = 0;
+        int totalUnenrolled = 0;
+        for (String id : allStudentIds) {
+            if (enrolledIds.contains(id)) {
+                totalEnrolled++;
+            } else {
+                totalUnenrolled++;
+            }
+        }
+        int totalStudents = allStudentIds.size();
+
+        // --- Minimalist White Card Stat Boxes ---
+        String cardStyle = "-fx-background-color: #fff; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-color: #e9ecef; -fx-border-width: 1; -fx-padding: 12 18 12 18; -fx-effect: dropshadow(gaussian, #e9ecef, 4, 0.08, 0, 1);";
+        // Make stat boxes smaller
+        double statBoxWidth = 180; // Smaller width
+        double statBoxHeight = 90; // Smaller height
+
+        StackPane enrolledBox = new StackPane();
+        enrolledBox.setStyle(cardStyle);
+        enrolledBox.setPrefSize(statBoxWidth, statBoxHeight);
+        VBox enrolledVBox = new VBox(6);
+        enrolledVBox.setAlignment(Pos.CENTER);
+        Label enrolledCount = new Label("0");
+        enrolledCount.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
+        Label enrolledLabel = new Label("Enrolled");
+        enrolledLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6c757d; -fx-font-weight: normal;");
+        enrolledVBox.getChildren().addAll(enrolledCount, enrolledLabel);
+        enrolledBox.getChildren().add(enrolledVBox);
+
+        StackPane unenrolledBox = new StackPane();
+        unenrolledBox.setStyle(cardStyle);
+        unenrolledBox.setPrefSize(statBoxWidth, statBoxHeight);
+        VBox unenrolledVBox = new VBox(6);
+        unenrolledVBox.setAlignment(Pos.CENTER);
+        Label unenrolledCount = new Label("0");
+        unenrolledCount.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
+        Label unenrolledLabel = new Label("Unenrolled");
+        unenrolledLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6c757d; -fx-font-weight: normal;");
+        unenrolledVBox.getChildren().addAll(unenrolledCount, unenrolledLabel);
+        unenrolledBox.getChildren().add(unenrolledVBox);
+
+        StackPane totalBox = new StackPane();
+        totalBox.setStyle(cardStyle);
+        totalBox.setPrefSize(statBoxWidth, statBoxHeight);
+        VBox totalVBox = new VBox(6);
+        totalVBox.setAlignment(Pos.CENTER);
+        Label totalCount = new Label("0");
+        totalCount.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #495057;");
+        Label totalLabel = new Label("Total");
+        totalLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6c757d; -fx-font-weight: normal;");
+        totalVBox.getChildren().addAll(totalCount, totalLabel);
+        totalBox.getChildren().add(totalVBox);
+
+        // Animate the counts
+        animateCount(enrolledCount, totalEnrolled);
+        animateCount(unenrolledCount, totalUnenrolled);
+        animateCount(totalCount, totalStudents);
+
+        // Enrollment by program (Donut Chart, minimalist card)
+        Map<String, Integer> programCounts = new HashMap<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader("enrollments.csv"))) {
+            String line = reader.readLine(); // skip header
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length < 6) continue;
+                String program = parts[2].trim();
+                String status = parts[4].trim();
+                if ("Enrolled".equalsIgnoreCase(status)) {
+                    programCounts.put(program, programCounts.getOrDefault(program, 0) + 1);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        List<ChartData> chartDataList = new ArrayList<>();
+        Color[] colors = {Tile.BLUE, Tile.GREEN, Tile.ORANGE, Tile.RED, Tile.GRAY};
+        int colorIdx = 0;
+        for (var entry : programCounts.entrySet()) {
+            chartDataList.add(new ChartData(entry.getKey(), entry.getValue(), colors[colorIdx % colors.length]));
+            colorIdx++;
+        }
         Tile enrollmentTile = TileBuilder.create()
                 .skinType(Tile.SkinType.DONUT_CHART)
-                .title("Enrollment by Department")
-                .text("2025 Term")
-                .animated(true) // Enables animated transitions in donut
-                .chartData(ccis, cba, cea, chm)
-                .titleColor(Color.BLACK)
-                .textColor(Color.BLACK)
-                .valueColor(Color.BLACK)
-                .backgroundColor(Color.web("#f8f9fa"))
-                .roundedCorners(true)
-                .prefSize(320, 260)
-                .build();
-
-        // Number tile
-        Tile instructorsTile = TileBuilder.create()
-                .skinType(Tile.SkinType.NUMBER)
-                .title("Total Instructors")
-                .unit("persons")
-                .value(0) // Start at 0 for smooth animation
+                .title("Enrollment by Program")
+                .text("")
                 .animated(true)
-                .titleColor(Color.BLACK)
-                .textColor(Color.BLACK)
-                .valueColor(Color.BLACK)
-                .backgroundColor(Color.web("#f8f9fa"))
+                .chartData(chartDataList.toArray(new ChartData[0]))
+                .titleColor(Color.web("#212529"))
+                .textColor(Color.web("#212529"))
+                .valueColor(Color.web("#212529"))
+                .backgroundColor(Color.web("#fff"))
                 .roundedCorners(true)
-                .prefSize(200, 150)
+                .prefSize(800, 500) // Medium chart size
                 .build();
+        StackPane donutCard = new StackPane(enrollmentTile);
+        donutCard.setStyle(cardStyle);
+        donutCard.setPadding(new Insets(0));
+        donutCard.setPrefSize(800, 500);
 
-        HBox cardsRow = new HBox(20, enrollmentTile, instructorsTile);
-        cardsRow.setPadding(new Insets(20, 20, 10, 20));
-        cardsRow.setAlignment(Pos.TOP_LEFT);
+        // --- Grid Layout: 3 stat boxes on top, chart below ---
+        GridPane grid = new GridPane();
+        grid.setHgap(16); // Less horizontal gap
+        grid.setVgap(16); // Less vertical gap
+        grid.setPadding(new Insets(24, 24, 24, 0)); // Less padding
+        grid.add(totalBox, 0, 0);
+        grid.add(enrolledBox, 1, 0);
+        grid.add(unenrolledBox, 2, 0);
+        grid.add(donutCard, 0, 1, 3, 1); // chart spans all 3 columns
+        GridPane.setHalignment(totalBox, javafx.geometry.HPos.LEFT);
+        GridPane.setHalignment(enrolledBox, javafx.geometry.HPos.LEFT);
+        GridPane.setHalignment(unenrolledBox, javafx.geometry.HPos.LEFT);
+        GridPane.setHalignment(donutCard, javafx.geometry.HPos.LEFT); // Align chart left
 
-        VBox dashboardLayout = new VBox(cardsRow);
-        dashboardLayout.setPadding(new Insets(20));
+        Label statsTitle = new Label("Statistics");
+        statsTitle.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #212529; -fx-padding: 0 0 0 0;"); // Increased bottom padding for gap
+
+        VBox dashboardLayout = new VBox(8, statsTitle, grid);
+        dashboardLayout.setPadding(new Insets(24, 24, 24, 24));
         dashboardLayout.setAlignment(Pos.TOP_LEFT);
-        dashboardLayout.setPrefHeight(400);  // Keeps space below empty
-        dashboardLayout.setStyle("-fx-background-color: white;");
-
+        dashboardLayout.setStyle("-fx-background-color: #f8fafc;");
+        dashboardLayout.setPrefHeight(700); // Smaller height
+        dashboardLayout.setPrefWidth(1200); // Smaller width
         setMainContent(dashboardLayout);
-
-        // Animate the data updates
-        Timeline timeline = new Timeline();
-        int steps = 60;
-        Duration duration = Duration.seconds(1);
-        for (int i = 0; i <= steps; i++) {
-            double frac = i / (double) steps;
-            timeline.getKeyFrames().add(new KeyFrame(duration.multiply(frac), _ -> {
-                ccis.setValue(frac * ccisTarget);
-                cba.setValue(frac * cbaTarget);
-                cea.setValue(frac * ceaTarget);
-                chm.setValue(frac * chmTarget);
-                instructorsTile.setValue(frac * instructorsTarget);
-            }));
-        }
-        timeline.play();
     }
 
 
@@ -392,7 +471,7 @@ public class AdminDashboardController {
                             for (int i = 0; i < arr.length(); i++) {
                                 org.json.JSONObject c = arr.getJSONObject(i);
                                 String code = c.optString("courseCode", "");
-                                String name = c.optString("courseName", "");
+                                String name = c.optString("courseName", "").replace("\n", " ").replace("\r", " ").trim();
                                 String units = String.valueOf(c.optInt("creditUnits", 0));
                                 parsed.add(new String[]{code, name, units});
                             }
@@ -751,6 +830,7 @@ public class AdminDashboardController {
         File termsFile = new File("terms.csv");
         ObservableList<String[]> availableCourses = FXCollections.observableArrayList();
         ObservableList<String[]> enrolledCourses = FXCollections.observableArrayList();
+        // --- Add FilteredList for available courses search ---
         FilteredList<String[]> filteredAvailableCourses = new FilteredList<>(availableCourses, ac -> true);
 
         // --- Collect all courses already enrolled in any term for this student ---
@@ -1002,6 +1082,19 @@ public class AdminDashboardController {
         acScheduleCol.setPrefWidth(120);
         availableCoursesTable.getColumns().setAll(acCodeCol, acNameCol, acUnitsCol, acSectionCol, acScheduleCol);
 
+        // --- Add search field for available courses ---
+        TextField availableCourseSearch = new TextField();
+        availableCourseSearch.setPromptText("Search available course code, name, or section...");
+        availableCourseSearch.setPrefWidth(300);
+        availableCourseSearch.textProperty().addListener((obs, oldVal, newVal) -> {
+            String search = newVal.toLowerCase();
+            filteredAvailableCourses.setPredicate(arr ->
+                    (arr.length > 0 && arr[0].toLowerCase().contains(search)) ||
+                            (arr.length > 1 && arr[1].toLowerCase().contains(search)) ||
+                            (arr.length > 3 && arr[3].toLowerCase().contains(search))
+            );
+        });
+
         TableView<String[]> enrolledCoursesTable = new TableView<>();
         enrolledCoursesTable.setPrefHeight(260);
         enrolledCoursesTable.setPrefWidth(500);
@@ -1234,7 +1327,7 @@ public class AdminDashboardController {
             schedDialog.showAndWait();
         });
 
-        VBox leftBox = new VBox(8, new Label("Available Courses"), availableCoursesTable, addCourseBtn);
+        VBox leftBox = new VBox(8, new Label("Available Courses"), availableCourseSearch, availableCoursesTable, addCourseBtn);
         VBox rightBox = new VBox(8, new Label("Enrolled Courses"), enrolledCoursesTable, removeCourseBtn);
         leftBox.setAlignment(Pos.TOP_CENTER);
         rightBox.setAlignment(Pos.TOP_CENTER);
@@ -1270,5 +1363,21 @@ public class AdminDashboardController {
     }
 
     @FXML private void onLogoutClick() { System.exit(0); }
-}
 
+    private void animateCount(Label label, int target) {
+        if (target <= 0) {
+            label.setText("0");
+            return;
+        }
+        Timeline timeline = new Timeline();
+        int durationMillis = 800; // total animation duration
+        int frames = Math.max(1, Math.min(target, 60)); // at least 1 frame
+        for (int i = 0; i <= frames; i++) {
+            int value = (int) Math.round(i * (target / (double) frames));
+            KeyFrame kf = new KeyFrame(Duration.millis(i * (durationMillis / (double) frames)),
+                    e -> label.setText(String.valueOf(value)));
+            timeline.getKeyFrames().add(kf);
+        }
+        timeline.play();
+    }
+}

@@ -47,7 +47,11 @@ public class HttpUtils {
     }
 
     public static String AutoSchedule(String coursesArrayJson, String roomsArrayJson) {
-        OkHttpClient client = new OkHttpClient();
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
         try {
             JSONArray coursesArr = new JSONArray((coursesArrayJson != null && !coursesArrayJson.trim().isEmpty()) ? coursesArrayJson : "[]");
             JSONArray roomsArr = new JSONArray((roomsArrayJson != null && !roomsArrayJson.trim().isEmpty()) ? roomsArrayJson : "[{\"Room\":\"R101\"},{\"Room\":\"R102\"},{\"Room\":\"R103\"},{\"Room\":\"R104\"}]");

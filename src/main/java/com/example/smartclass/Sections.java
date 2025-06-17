@@ -8,6 +8,7 @@ import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -56,6 +57,18 @@ public class Sections {
         sectionTable.setPrefHeight(320);
         sectionTable.setPrefWidth(700);
         sectionTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        sectionTable.setStyle("-fx-background-color: #f0f0f0; -fx-table-cell-border-color: #e0e0e0;");
+        // --- Loading overlay setup ---
+        ProgressIndicator loadingIndicator = new ProgressIndicator();
+        loadingIndicator.setMaxSize(40, 40);
+        loadingIndicator.setStyle("-fx-progress-color: #2196f3;"); // blue
+        StackPane loadingOverlay = new StackPane();
+        loadingOverlay.getChildren().add(loadingIndicator);
+        loadingOverlay.setStyle("-fx-background-color: rgba(255,255,255,0.4); -fx-backdrop-filter: blur(4px);");
+        loadingOverlay.setVisible(false);
+        loadingOverlay.setMouseTransparent(false); // Block mouse events
+        StackPane tableStack = new StackPane(sectionTable, loadingOverlay);
+        // --- Table columns setup ---
         String[] headers = {"Term", "Section", "Program", "Course Code", "Course Name", "Units", "Schedule"};
         for (int i = 0; i < headers.length; i++) {
             final int idx = i;
@@ -67,6 +80,48 @@ public class Sections {
         ObservableList<String[]> sectionData = FXCollections.observableArrayList();
         FilteredList<String[]> filteredSectionData = new FilteredList<>(sectionData, s -> true);
         sectionTable.setItems(filteredSectionData);
+
+        // --- Highlight conflicts in sectionTable ---
+        sectionTable.setRowFactory(tv -> new TableRow<String[]>() {
+            @Override
+            protected void updateItem(String[] item, boolean empty) {
+                super.updateItem(item, empty);
+                if (item == null || empty) {
+                    setStyle("");
+                } else {
+                    boolean conflict = false;
+                    String itemSchedule = item[6];
+                    for (String[] other : sectionTable.getItems()) {
+                        if (other == item) continue;
+                        // Only check for same section and same term
+                        if (item[0].equals(other[0]) && item[1].equals(other[1])) {
+                            String otherSchedule = other[6];
+                            if (itemSchedule != null && otherSchedule != null && !itemSchedule.equals("N/A") && !otherSchedule.equals("N/A") && !itemSchedule.isEmpty() && !otherSchedule.isEmpty()) {
+                                String daysA = extractDays(itemSchedule);
+                                String daysB = extractDays(otherSchedule);
+                                if (daysA != null && daysB != null) {
+                                    String[] arrA = daysA.split("/");
+                                    String[] arrB = daysB.split("/");
+                                    outer: for (String d1 : arrA) for (String d2 : arrB) if (d1.trim().equalsIgnoreCase(d2.trim())) {
+                                        int[] timeA = extractTimeRange(itemSchedule);
+                                        int[] timeB = extractTimeRange(otherSchedule);
+                                        if (timeA != null && timeB != null && timeA[0] < timeB[1] && timeA[1] > timeB[0]) {
+                                            conflict = true;
+                                            break outer;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (conflict) {
+                        setStyle("-fx-background-color: #ffcccc;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
 
         Runnable refreshSections = () -> {
             sectionData.clear();
@@ -173,10 +228,10 @@ public class Sections {
             dialog.setResultConverter(btn -> {
                 if (btn == ButtonType.OK) {
                     String program = programBox.getValue();
-                    String section = sectionField.getText().trim();
+                    String sectionInput = sectionField.getText().trim();
                     String term = termSelect.getValue();
                     ObservableList<String[]> selected = coursesTable.getSelectionModel().getSelectedItems();
-                    if (program == null || section.isEmpty() || selected.isEmpty() || term == null) {
+                    if (program == null || sectionInput.isEmpty() || selected.isEmpty() || term == null) {
                         Alert alert = new Alert(Alert.AlertType.ERROR, "Please select a term, program, enter a section name, select at least one course.");
                         alert.showAndWait();
                         return null;
@@ -195,12 +250,18 @@ public class Sections {
                             });
                         } catch (IOException ex) { ex.printStackTrace(); }
                     }
+                    // Split section names by comma, trim, and create for each
+                    String[] sectionNames = sectionInput.split(",");
                     try (FileWriter fw = new FileWriter(coursesFile, true)) {
                         if (!fileExists) fw.write("Program,Section,CourseCode,CourseName,Units,Term,Schedule\n");
-                        for (String[] c : selected) {
-                            String key = term + "," + section + "," + c[0];
-                            if (existing.contains(key)) continue; // skip duplicate
-                            fw.write(program + "," + section + "," + c[0] + "," + c[1] + "," + c[2] + "," + term + ",N/A\n");
+                        for (String section : sectionNames) {
+                            section = section.trim();
+                            if (section.isEmpty()) continue;
+                            for (String[] c : selected) {
+                                String key = term + "," + section + "," + c[0];
+                                if (existing.contains(key)) continue; // skip duplicate
+                                fw.write(program + "," + section + "," + c[0] + "," + c[1] + "," + c[2] + "," + term + ",N/A\n");
+                            }
                         }
                     } catch (IOException ex) { ex.printStackTrace(); }
                 }
@@ -547,116 +608,187 @@ public class Sections {
         // --- Auto Schedule All Button ---
         Button autoScheduleBtn = new Button("Auto Schedule All");
         autoScheduleBtn.setOnAction(e -> {
-            // ---
-            JSONArray arr = new JSONArray();
-            String selectedTerm = termBox.getValue();
-            for (String[] row : sectionData) {
-                // Only include rows from the selected term
-                if (selectedTerm == null || !row[0].equals(selectedTerm)) continue;
-                JSONObject obj = new JSONObject();
-                obj.put("term", row[0]);
-                obj.put("section", row[1]);
-                obj.put("program", row[2]);
-                obj.put("courseCode", row[3]);
-                obj.put("courseName", row[4]);
-                obj.put("units", row[5]);
-                obj.put("schedule", row[6]);
-                arr.put(obj);
-            }
-            // Print rooms.csv as JSON
-            JSONArray roomsArr = new JSONArray();
-            try (BufferedReader br = new BufferedReader(new FileReader("rooms.csv"))) {
-                String headerLine = br.readLine();
-                if (headerLine != null) {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        String[] values = line.split(",");
-                        JSONObject roomObj = new JSONObject();
-                        for (int i = 0; i < headers.length && i < values.length; i++) {
-                            roomObj.put("Room", values[i]);
-                        }
-                        roomsArr.put(roomObj);
+            loadingOverlay.setVisible(true);
+            autoScheduleBtn.setDisable(true);
+            new Thread(() -> {
+                try {
+                    JSONArray arr = new JSONArray();
+                    String selectedTerm = termBox.getValue();
+                    for (String[] row : sectionData) {
+                        // Only include rows from the selected term
+                        if (selectedTerm == null || !row[0].equals(selectedTerm)) continue;
+                        JSONObject obj = new JSONObject();
+                        obj.put("term", row[0]);
+                        obj.put("section", row[1]);
+                        obj.put("program", row[2]);
+                        obj.put("courseCode", row[3]);
+                        obj.put("courseName", row[4]);
+                        obj.put("units", row[5]);
+                        obj.put("schedule", row[6]);
+                        arr.put(obj);
                     }
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-            String result = HttpUtils.AutoSchedule(arr.toString(2), roomsArr.toString(2));
-            // Validate result is a JSON array
-            JSONArray newSchedules = null;
-            System.out.println(result);
-            try {
-                newSchedules = new JSONArray(result);
-            } catch (Exception ex) {
-                Alert alert = new Alert(Alert.AlertType.ERROR, "Auto-schedule failed: " + result);
-                alert.showAndWait();
-                return;
-            }
-            JSONArray finalNewSchedules = newSchedules;
-            javafx.application.Platform.runLater(() -> {
-                Dialog<ButtonType> dialog = new Dialog<>();
-                dialog.setTitle("Confirm Auto-Schedule Changes");
-                dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-                TableView<org.json.JSONObject> table = new TableView<>();
-                table.setPrefHeight(320);
-                table.setPrefWidth(700);
-                // Only show courseCode, courseName, schedule columns
-                String[] cols = {"courseCode", "courseName", "schedule"};
-                for (String colName : cols) {
-                    TableColumn<org.json.JSONObject, String> col = new TableColumn<>(colName.substring(0,1).toUpperCase()+colName.substring(1));
-                    col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().optString(colName, "")));
-                    // Make schedule column fill the rest of the table
-                    if (colName.equals("schedule")) {
-                        col.setPrefWidth(350);
-                        col.setMinWidth(200);
-                        col.setMaxWidth(Double.MAX_VALUE);
-                        col.setResizable(true);
-                    } else {
-                        col.setPrefWidth(colName.equals("courseName") ? 220 : 150);
-                    }
-                    table.getColumns().add(col);
-                }
-                ObservableList<org.json.JSONObject> items = FXCollections.observableArrayList();
-                for (int i = 0; i < finalNewSchedules.length(); i++) {
-                    items.add(finalNewSchedules.getJSONObject(i));
-                }
-                table.setItems(items);
-                VBox vbox = new VBox(new Label("The following schedules will be applied. Proceed?"), table);
-                vbox.setPadding(new Insets(10));
-                dialog.getDialogPane().setContent(vbox);
-                dialog.setResizable(true);
-                dialog.setResultConverter(btn -> btn);
-                dialog.showAndWait().ifPresent(btn -> {
-                    if (btn == ButtonType.OK) {
-                        File coursesFile = new File("courses.csv");
-                        List<String> lines = new ArrayList<>();
-                        try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
-                            String header = br.readLine();
-                            if (header != null) lines.add(header);
-                            br.lines().forEach(lines::add);
-                        } catch (IOException ex) { ex.printStackTrace(); }
-                        for (int i = 0; i < finalNewSchedules.length(); i++) {
-                            JSONObject sched = finalNewSchedules.getJSONObject(i);
-                            for (int j = 1; j < lines.size(); j++) {
-                                String[] arrLine = lines.get(j).split(",", -1);
-                                if (arrLine.length >= 7 &&
-                                        arrLine[5].equals(sched.optString("term")) &&
-                                        arrLine[1].equals(sched.optString("section")) &&
-                                        arrLine[0].equals(sched.optString("program")) &&
-                                        arrLine[2].equals(sched.optString("courseCode")) &&
-                                        arrLine[3].equals(sched.optString("courseName"))) {
-                                    arrLine[6] = sched.optString("schedule");
-                                    lines.set(j, String.join(",", arrLine));
+                    JSONArray roomsArr = new JSONArray();
+                    try (BufferedReader br = new BufferedReader(new FileReader("rooms.csv"))) {
+                        String headerLine = br.readLine();
+                        if (headerLine != null) {
+                            String line;
+                            while ((line = br.readLine()) != null) {
+                                String[] values = line.split(",");
+                                JSONObject roomObj = new JSONObject();
+                                for (int i = 0; i < headers.length && i < values.length; i++) {
+                                    roomObj.put("Room", values[i]);
                                 }
+                                roomsArr.put(roomObj);
                             }
                         }
-                        try (FileWriter fw = new FileWriter(coursesFile, false)) {
-                            for (String l : lines) fw.write(l + "\n");
-                        } catch (IOException ex) { ex.printStackTrace(); }
-                        refreshSections.run();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
                     }
-                });
-            });
+                    String result = HttpUtils.AutoSchedule(arr.toString(2), roomsArr.toString(2));
+                    JSONArray newSchedules = null;
+                    try {
+                        newSchedules = new JSONArray(result);
+                    } catch (Exception ex) {
+                        final String errorMsg = result;
+                        javafx.application.Platform.runLater(() -> {
+                            loadingIndicator.setVisible(false);
+                            Alert alert = new Alert(Alert.AlertType.ERROR, "Auto-schedule failed: " + errorMsg);
+                            alert.showAndWait();
+                        });
+                        return;
+                    }
+                    JSONArray finalNewSchedules = newSchedules;
+                    javafx.application.Platform.runLater(() -> {
+                        loadingOverlay.setVisible(false);
+                        autoScheduleBtn.setDisable(false);
+                        Dialog<ButtonType> dialog = new Dialog<>();
+                        dialog.setTitle("Confirm Auto-Schedule Changes");
+                        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+                        TableView<org.json.JSONObject> table = new TableView<>();
+                        table.setEditable(true);
+                        table.setPrefHeight(320);
+                        table.setPrefWidth(700);
+                        // Only show courseCode, courseName, schedule columns
+                        String[] cols = {"courseCode", "courseName", "schedule"};
+                        for (String colName : cols) {
+                            TableColumn<org.json.JSONObject, String> col = new TableColumn<>(colName.substring(0,1).toUpperCase()+colName.substring(1));
+                            col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().optString(colName, "")));
+                            if (colName.equals("schedule")) {
+                                col.setPrefWidth(350);
+                                col.setMinWidth(200);
+                                col.setMaxWidth(Double.MAX_VALUE);
+                                col.setResizable(true);
+                                // Make schedule column editable
+                                col.setCellFactory(TextFieldTableCell.forTableColumn());
+                                col.setOnEditCommit(event -> {
+                                    org.json.JSONObject obj = event.getRowValue();
+                                    obj.put("schedule", event.getNewValue());
+                                    table.refresh();
+                                });
+                            } else {
+                                col.setPrefWidth(colName.equals("courseName") ? 220 : 150);
+                            }
+                            table.getColumns().add(col);
+                        }
+                        ObservableList<org.json.JSONObject> items = FXCollections.observableArrayList();
+                        for (int i = 0; i < finalNewSchedules.length(); i++) {
+                            items.add(finalNewSchedules.getJSONObject(i));
+                        }
+                        table.setItems(items);
+
+                        // --- Conflict detection helper ---
+                        table.setRowFactory(tv -> new TableRow<org.json.JSONObject>() {
+                            @Override
+                            protected void updateItem(org.json.JSONObject item, boolean empty) {
+                                super.updateItem(item, empty);
+                                if (item == null || empty) {
+                                    setStyle("");
+                                } else {
+                                    boolean conflict = false;
+                                    for (org.json.JSONObject other : table.getItems()) {
+                                        if (other == item) continue;
+                                        if (isScheduleConflict(item, other)) {
+                                            conflict = true;
+                                            break;
+                                        }
+                                    }
+                                    if (conflict) {
+                                        setStyle("-fx-background-color: #ffcccc;");
+                                    } else {
+                                        setStyle("");
+                                    }
+                                }
+                            }
+                        });
+
+                        // Re-check conflicts on edit
+                        items.addListener((javafx.collections.ListChangeListener<org.json.JSONObject>) c -> table.refresh());
+                        // Remove: table.setOnEditCommit(e -> table.refresh());
+                        // Instead, add edit commit handler to the schedule column only
+                        for (TableColumn<org.json.JSONObject, ?> col : table.getColumns()) {
+                            if (col.getText().equalsIgnoreCase("Schedule")) {
+                                ((TableColumn<org.json.JSONObject, String>) col).setOnEditCommit(event -> {
+                                    org.json.JSONObject obj = event.getRowValue();
+                                    obj.put("schedule", event.getNewValue());
+                                    table.refresh();
+                                });
+                            }
+                        }
+
+                        VBox vbox = new VBox(new Label("The following schedules will be applied. Proceed? (Conflicts are highlighted in red. You may edit schedules before confirming.)"), table);
+                        vbox.setPadding(new Insets(10));
+                        dialog.getDialogPane().setContent(vbox);
+                        dialog.setResizable(true);
+                        dialog.setResultConverter(btn -> btn);
+                        dialog.showAndWait().ifPresent(btn -> {
+                            if (btn == ButtonType.OK) {
+                                // Before saving, check for any remaining conflicts
+                                for (org.json.JSONObject obj1 : items) {
+                                    for (org.json.JSONObject obj2 : items) {
+                                        if (obj1 == obj2) continue;
+                                        if (isScheduleConflict(obj1, obj2)) {
+                                            Alert alert = new Alert(Alert.AlertType.ERROR, "Cannot save: There are still schedule conflicts highlighted in red.");
+                                            alert.showAndWait();
+                                            return;
+                                        }
+                                    }
+                                }
+                                File coursesFile = new File("courses.csv");
+                                List<String> lines = new ArrayList<>();
+                                try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                                    String header = br.readLine();
+                                    if (header != null) lines.add(header);
+                                    br.lines().forEach(lines::add);
+                                } catch (IOException ex) { ex.printStackTrace(); }
+                                for (org.json.JSONObject sched : items) {
+                                    for (int j = 1; j < lines.size(); j++) {
+                                        String[] arrLine = lines.get(j).split(",", -1);
+                                        if (arrLine.length >= 7 &&
+                                                arrLine[5].equals(sched.optString("term")) &&
+                                                arrLine[1].equals(sched.optString("section")) &&
+                                                arrLine[0].equals(sched.optString("program")) &&
+                                                arrLine[2].equals(sched.optString("courseCode")) &&
+                                                arrLine[3].equals(sched.optString("courseName"))) {
+                                            arrLine[6] = sched.optString("schedule");
+                                            lines.set(j, String.join(",", arrLine));
+                                        }
+                                    }
+                                }
+                                try (FileWriter fw = new FileWriter(coursesFile, false)) {
+                                    for (String l : lines) fw.write(l + "\n");
+                                } catch (IOException ex) { ex.printStackTrace(); }
+                                refreshSections.run();
+                            }
+                        });
+                    });
+                } finally {
+                    // In case of any unexpected error, ensure loading is hidden
+                    javafx.application.Platform.runLater(() -> {
+                        loadingOverlay.setVisible(false);
+                        autoScheduleBtn.setDisable(false);
+                    });
+                }
+            }).start();
         });
 
         // --- Mass Delete Button ---
@@ -694,7 +826,7 @@ public class Sections {
         });
 
         HBox topBar = new HBox(10, new Label("Term:"), termBox, searchField, createSectionBtn, massDeleteBtn, autoScheduleBtn);
-        layout.getChildren().addAll(topBar, new Label("Sections List"), sectionTable);
+        layout.getChildren().addAll(topBar, new Label("Sections List"), tableStack);
         return layout;
     }
 
@@ -730,5 +862,75 @@ public class Sections {
         }
         return "N/A";
     }
-}
 
+    // --- Helper for schedule conflict detection ---
+    private static boolean isScheduleConflict(org.json.JSONObject a, org.json.JSONObject b) {
+        // Check same room
+        String schedA = a.optString("schedule", "");
+        String schedB = b.optString("schedule", "");
+        if (schedA == null || schedB == null || schedA.equals("N/A") || schedB.equals("N/A") || schedA.isEmpty() || schedB.isEmpty()) return false;
+        String roomA = extractRoom(schedA);
+        String roomB = extractRoom(schedB);
+        if (roomA == null || roomB == null || !roomA.equals(roomB)) return false;
+        // Allow same time/room if section is different
+        if (!a.optString("section", "").equals(b.optString("section", ""))) return false;
+        // Check day overlap
+        String daysA = extractDays(schedA);
+        String daysB = extractDays(schedB);
+        if (daysA == null || daysB == null) return false;
+        String[] arrA = daysA.split("/");
+        String[] arrB = daysB.split("/");
+        boolean dayOverlap = false;
+        for (String d1 : arrA) for (String d2 : arrB) if (d1.equals(d2)) dayOverlap = true;
+        if (!dayOverlap) return false;
+        // Check time overlap
+        int[] timeA = extractTimeRange(schedA);
+        int[] timeB = extractTimeRange(schedB);
+        if (timeA == null || timeB == null) return false;
+        return timeA[0] < timeB[1] && timeA[1] > timeB[0];
+    }
+    private static String extractRoom(String schedule) {
+        if (schedule == null) return null;
+        int start = schedule.indexOf('(');
+        int end = schedule.indexOf(')');
+        if (start >= 0 && end > start) {
+            return schedule.substring(start + 1, end).trim();
+        }
+        return null;
+    }
+
+    // --- Helper for schedule conflict detection in sectionTable ---
+    private static String extractDays(String sched) {
+        int lastSpace = sched.lastIndexOf(' ');
+        if (lastSpace > 0) {
+            String possibleDays = sched.substring(lastSpace + 1);
+            if (possibleDays.matches("[A-Za-z/]+")) {
+                return possibleDays;
+            }
+        }
+        return null;
+    }
+    private static int[] extractTimeRange(String sched) {
+        if (sched.matches(".*\\d{2}:\\d{2}-\\d{2}:\\d{2}.*")) {
+            String[] parts = sched.split(" ");
+            for (String part : parts) {
+                if (part.matches("\\d{2}:\\d{2}-\\d{2}:\\d{2}")) {
+                    String[] times = part.split("-");
+                    int start = Integer.parseInt(times[0].split(":")[0]);
+                    int end = Integer.parseInt(times[1].split(":")[0]);
+                    return new int[]{start, end};
+                }
+            }
+        } else if (sched.matches(".*\\d+h.*")) {
+            int hIdx = sched.indexOf("h");
+            if (hIdx > 0) {
+                String before = sched.substring(0, hIdx).replaceAll("[^0-9]", "");
+                try {
+                    int hours = Integer.parseInt(before);
+                    return new int[]{7, 7 + hours};
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+}
