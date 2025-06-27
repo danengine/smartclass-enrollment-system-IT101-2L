@@ -9,16 +9,22 @@ import javafx.animation.Timeline;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -31,8 +37,10 @@ import javafx.util.converter.IntegerStringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.awt.*;
 import java.io.*;
 import java.util.*;
+import java.util.List;
 import java.util.function.Function;
 
 public class AdminDashboardController {
@@ -116,7 +124,7 @@ public class AdminDashboardController {
         enrolledVBox.setAlignment(Pos.CENTER);
         Label enrolledCount = new Label("0");
         enrolledCount.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
-        Label enrolledLabel = new Label("Enrolled");
+        Label enrolledLabel = new Label("Total Enrolled");
         enrolledLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6c757d; -fx-font-weight: normal;");
         enrolledVBox.getChildren().addAll(enrolledCount, enrolledLabel);
         enrolledBox.getChildren().add(enrolledVBox);
@@ -140,7 +148,7 @@ public class AdminDashboardController {
         totalVBox.setAlignment(Pos.CENTER);
         Label totalCount = new Label("0");
         totalCount.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #495057;");
-        Label totalLabel = new Label("Total");
+        Label totalLabel = new Label("Total Students");
         totalLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6c757d; -fx-font-weight: normal;");
         totalVBox.getChildren().addAll(totalCount, totalLabel);
         totalBox.getChildren().add(totalVBox);
@@ -541,13 +549,34 @@ public class AdminDashboardController {
 
     @FXML
     private void onEnrollmentsClick() {
-        VBox layout = new VBox(10);
-        layout.setPadding(new Insets(20));
-        layout.setStyle("-fx-background-color: white;");
+        // --- Card Layout for Enrollment List ---
+        StackPane rootPane = new StackPane();
+        rootPane.setStyle("-fx-background-color: #f4f6f7;");
 
-        // Term selection
+        VBox outerVBox = new VBox(20);
+        outerVBox.setAlignment(Pos.TOP_CENTER);
+        outerVBox.setStyle("-fx-padding: 36 32 36 32;");
+
+        VBox card = new VBox(16);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 12; -fx-border-color: #dcdde1; -fx-border-radius: 12; -fx-padding: 24 24 24 24; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 12, 0, 0, 4);");
+
+        // Title
+        HBox titleBox = new HBox(12);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        Label titleLabel = new Label("📋 Enrollment List");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        titleBox.getChildren().add(titleLabel);
+
+        // Filters (Term ComboBox + Search)
+        HBox filterBox = new HBox(10);
+        filterBox.setAlignment(Pos.CENTER_LEFT);
+        Label filterLabel = new Label("Filter by:");
+        filterLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #636e72;");
         ComboBox<String> termBox = new ComboBox<>();
-        termBox.setPromptText("Select Term");
+        termBox.setPromptText("Term");
+        termBox.setPrefWidth(140);
+        termBox.setStyle("-fx-background-radius: 8; -fx-font-size: 13px;");
         File termsFile = new File("terms.csv");
         if (termsFile.exists()) {
             try (BufferedReader br = new BufferedReader(new FileReader(termsFile))) {
@@ -561,14 +590,18 @@ public class AdminDashboardController {
                 e.printStackTrace();
             }
         }
-
-        // Search field
         TextField searchField = new TextField();
         searchField.setPromptText("Search by ID or Name...");
-        searchField.setPrefWidth(250);
+        searchField.setPrefWidth(220);
+        searchField.setStyle("-fx-background-radius: 8; -fx-padding: 6 10;");
+        Region filterSpacer = new Region();
+        HBox.setHgrow(filterSpacer, Priority.ALWAYS);
+        filterBox.getChildren().addAll(filterLabel, termBox, searchField, filterSpacer);
 
-        // Table setup
+        // TableView
         TableView<String[]> table = new TableView<>();
+        table.setPrefHeight(340);
+        table.setStyle("-fx-background-radius: 0;");
         String[] headers = {"Student ID", "Student Name", "Program", "Year", "Status"};
         for (int i = 0; i < headers.length; i++) {
             final int idx = i;
@@ -580,6 +613,59 @@ public class AdminDashboardController {
         ObservableList<String[]> data = FXCollections.observableArrayList();
         FilteredList<String[]> filtered = new FilteredList<>(data, s -> true);
         table.setItems(filtered);
+        // Double-click opens showStudentEnrollmentDialog
+        table.setRowFactory(tv -> {
+            TableRow<String[]> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    String[] studentRow = row.getItem();
+                    String term = termBox.getValue();
+                    // Compose a student array for showStudentEnrollmentDialog
+                    // studentRow: [Student ID, Student Name, Program, Year, Status]
+                    // Find full student info from students.csv
+                    String[] studentInfo = null;
+                    File studentsFile = new File("students.csv");
+                    if (studentsFile.exists()) {
+                        try (BufferedReader br = new BufferedReader(new FileReader(studentsFile))) {
+                            br.readLine(); // skip header
+                            String line;
+                            while ((line = br.readLine()) != null) {
+                                String[] arr = line.split(",", -1);
+                                if (arr.length > 0 && arr[0].equals(studentRow[0])) {
+                                    studentInfo = arr;
+                                    break;
+                                }
+                            }
+                        } catch (IOException e) { e.printStackTrace(); }
+                    }
+                    if (studentInfo != null) {
+                        // Compose the expected array for showStudentEnrollmentDialog
+                        // [ID, Name, Suffix, Email, Gender, Address, Contact, Program, Year, DateEnrolled]
+                        String[] dialogArr = new String[10];
+                        dialogArr[0] = studentInfo[0];
+                        dialogArr[1] = studentInfo.length > 2 ? studentInfo[2] : studentRow[1];
+                        dialogArr[2] = studentInfo.length > 3 ? studentInfo[3] : "";
+                        dialogArr[3] = studentInfo.length > 4 ? studentInfo[4] : "";
+                        dialogArr[4] = studentInfo.length > 5 ? studentInfo[5] : "";
+                        dialogArr[5] = studentInfo.length > 6 ? studentInfo[6] : "";
+                        dialogArr[6] = studentInfo.length > 7 ? studentInfo[7] : "";
+                        dialogArr[7] = studentInfo.length > 8 ? studentInfo[8] : studentRow[2];
+                        dialogArr[8] = studentInfo.length > 9 ? studentInfo[9] : studentRow[3];
+                        dialogArr[9] = studentInfo.length > 10 ? studentInfo[10] : "";
+                        showStudentEnrollmentDialog(dialogArr, term, null);
+                    } else {
+                        // Fallback: use what we have
+                        String[] fallbackArr = new String[10];
+                        fallbackArr[0] = studentRow[0];
+                        fallbackArr[1] = studentRow[1];
+                        fallbackArr[7] = studentRow[2];
+                        fallbackArr[8] = studentRow[3];
+                        showStudentEnrollmentDialog(fallbackArr, term, null);
+                    }
+                }
+            });
+            return row;
+        });
 
         // Load enrollments for selected term
         Runnable refreshTable = () -> {
@@ -598,56 +684,27 @@ public class AdminDashboardController {
                 }
             }
         };
-
         // Filter by search
         searchField.textProperty().addListener((obs, old, val) -> {
             String search = val.toLowerCase();
             filtered.setPredicate(arr -> arr[0].toLowerCase().contains(search) || arr[1].toLowerCase().contains(search));
         });
-
         // Refresh table when term changes
         termBox.valueProperty().addListener((obs, old, val) -> refreshTable.run());
-
         refreshTable.run();
 
-        // Enable double-click to edit enrollment
-        table.setRowFactory(tv -> {
-            TableRow<String[]> row = new TableRow<>();
-            row.setOnMouseClicked(event -> {
-                if (!row.isEmpty() && event.getClickCount() == 2) {
-                    String[] enrollment = row.getItem();
-                    String studentId = enrollment[0];
-                    // Fetch full student record from students.csv
-                    String[] fullStudent = null;
-                    File studentsFile = new File("students.csv");
-                    if (studentsFile.exists()) {
-                        try (BufferedReader br = new BufferedReader(new FileReader(studentsFile))) {
-                            br.readLine(); // skip header
-                            fullStudent = br.lines()
-                                    .map(line -> line.split(",", -1))
-                                    .filter(arr -> arr.length > 8 && arr[0].equals(studentId))
-                                    .findFirst().orElse(null);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    if (fullStudent != null) {
-                        showStudentEnrollmentDialog(fullStudent, termBox.getValue(), refreshTable);
-                        refreshTable.run();
-                    } else {
-                        Alert alert = new Alert(Alert.AlertType.ERROR, "Full student record not found.");
-                        alert.showAndWait();
-                    }
-                }
-            });
-            return row;
-        });
-
-        Button enrollBtn = new Button("+ Enroll a Student");
+        // Buttons
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        Region buttonSpacer = new Region();
+        HBox.setHgrow(buttonSpacer, Priority.ALWAYS);
+        Button enrollBtn = new Button("➕ Enroll Student");
+        enrollBtn.setPrefWidth(140);
+        enrollBtn.setStyle("-fx-background-color: #0984e3; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
         enrollBtn.setOnAction(e -> enrollStudent(termBox.getValue(), refreshTable));
-
-        // --- Delete Button ---
         Button deleteBtn = new Button("Delete Student");
+        deleteBtn.setPrefWidth(140);
+        deleteBtn.setStyle("-fx-background-color: #636e72; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
         deleteBtn.setDisable(true);
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
             deleteBtn.setDisable(newSel == null);
@@ -703,12 +760,13 @@ public class AdminDashboardController {
                 });
             }
         });
+        buttonBox.getChildren().addAll(buttonSpacer, enrollBtn, deleteBtn);
 
-        HBox topBar = new HBox(10, new Label("Term:"), termBox, searchField);
-        topBar.setAlignment(Pos.CENTER_LEFT);
-        HBox buttonBar = new HBox(10, enrollBtn, deleteBtn);
-        layout.getChildren().addAll(topBar, new Label("Enrollments List"), table, buttonBar);
-        setMainContent(layout);
+        // Add all to card
+        card.getChildren().addAll(titleBox, filterBox, table, buttonBox);
+        outerVBox.getChildren().add(card);
+        rootPane.getChildren().add(outerVBox);
+        setMainContent(rootPane);
     }
 
     // Helper to delete a directory recursively
@@ -726,12 +784,42 @@ public class AdminDashboardController {
 
     private void enrollStudent(String selectedTerm, Runnable refreshTable) {
         Stage dialog = new Stage();
-        dialog.setTitle("Search Student to Enroll");
+        dialog.setTitle("");
         dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initStyle(javafx.stage.StageStyle.UNDECORATED); // Remove window decorations
 
-        VBox root = new VBox(15);
-        root.setPadding(new Insets(20));
-        root.setStyle("-fx-background-color: white;");
+        // --- Custom Header (copied and adapted from StudentsController) ---
+        HBox customHeader = new HBox();
+        customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-color: #b0b0b0; -fx-border-width: 0 0 1 0;");
+        customHeader.setAlignment(Pos.CENTER_LEFT);
+        customHeader.setMinHeight(48);
+        customHeader.setPrefHeight(48);
+        customHeader.setMaxWidth(Double.MAX_VALUE);
+        Label customTitle = new Label("Search Student to Enroll");
+        customTitle.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 0 0 0 24; -fx-font-family: 'Segoe UI', Arial, sans-serif;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button closeBtn = new Button("✕");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 18 0 18;");
+        closeBtn.setOnAction(event -> dialog.close());
+        customHeader.getChildren().addAll(customTitle, spacer, closeBtn);
+        // Enable window dragging using the custom header
+        final double[] dragOffset = new double[2];
+        customHeader.setOnMousePressed(event -> {
+            dragOffset[0] = event.getScreenX() - dialog.getX();
+            dragOffset[1] = event.getScreenY() - dialog.getY();
+        });
+        customHeader.setOnMouseDragged(event -> {
+            dialog.setX(event.getScreenX() - dragOffset[0]);
+            dialog.setY(event.getScreenY() - dragOffset[1]);
+        });
+
+        VBox root = new VBox(0); // No gap between header and content
+        root.setStyle("-fx-background-color: white; -fx-border-color: #b0b0b0; -fx-border-width: 2;");
+        root.getChildren().add(customHeader);
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setStyle("");
 
         TextField searchField = new TextField();
         searchField.setPromptText("Search by ID or Name...");
@@ -757,7 +845,15 @@ public class AdminDashboardController {
                 br.readLine(); // skip header
                 br.lines()
                         .map(line -> line.split(",", -1))
-                        .forEach(students::add);
+                        .forEach(arr -> {
+                            // Ignore index 1 (LRN)
+                            String[] filtered = new String[arr.length - 1];
+                            filtered[0] = arr[0]; // ID
+                            for (int i = 2; i < arr.length; i++) {
+                                filtered[i - 1] = arr[i];
+                            }
+                            students.add(filtered);
+                        });
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -797,15 +893,17 @@ public class AdminDashboardController {
             }
         });
 
-        root.getChildren().addAll(
+        content.getChildren().addAll(
                 new Label("Search and Select Student"),
                 searchField,
                 table,
                 enrollBtn
         );
+        root.getChildren().add(content);
 
-        Scene scene = new Scene(root, 750, 400);
+        Scene scene = new Scene(root, 820, 400);
         dialog.setScene(scene);
+        dialog.centerOnScreen();
         dialog.showAndWait();
     }
 
@@ -813,6 +911,9 @@ public class AdminDashboardController {
         Stage dialog = new Stage();
         dialog.setTitle("Manage Enrollment for " + student[1]);
         dialog.initModality(Modality.APPLICATION_MODAL);
+
+        // Make dialog full screen
+        dialog.setMaximized(true);
 
         VBox root = new VBox(18);
         root.setPadding(new Insets(24));
@@ -830,11 +931,10 @@ public class AdminDashboardController {
         File termsFile = new File("terms.csv");
         ObservableList<String[]> availableCourses = FXCollections.observableArrayList();
         ObservableList<String[]> enrolledCourses = FXCollections.observableArrayList();
-        // --- Add FilteredList for available courses search ---
         FilteredList<String[]> filteredAvailableCourses = new FilteredList<>(availableCourses, ac -> true);
 
         // --- Collect all courses already enrolled in any term for this student ---
-        java.util.Set<String> allEnrolledCourseCodes = new java.util.HashSet<>();
+        Set<String> allEnrolledCourseCodes = new HashSet<>();
         if (student[0] != null) {
             File studentDir = new File("students/" + student[0]);
             if (studentDir.exists() && studentDir.isDirectory()) {
@@ -861,7 +961,7 @@ public class AdminDashboardController {
         }
 
         // --- Collect all enrollments from enrollments.csv for duplicate check ---
-        java.util.Set<String> allEnrollmentKeys = new java.util.HashSet<>();
+        Set<String> allEnrollmentKeys = new HashSet<>();
         File enrollmentsFile = new File("enrollments.csv");
         if (enrollmentsFile.exists()) {
             try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
@@ -883,7 +983,7 @@ public class AdminDashboardController {
             if (student != null && term != null) {
                 File enrolledFile = new File("students/" + student[0] + "/" + term + "/courses.csv");
                 enrolledFile.getParentFile().mkdirs();
-                try (java.io.FileWriter fw = new java.io.FileWriter(enrolledFile, false)) {
+                try (FileWriter fw = new FileWriter(enrolledFile, false)) {
                     fw.write("Code,Name,Units,Section,Schedule\n");
                     for (String[] course : enrolledCourses) {
                         fw.write(course[0] + "," + course[1] + "," + (course.length > 2 ? course[2] : "") + "," + (course.length > 3 ? course[3] : "") + "," + (course.length > 4 ? course[4] : "") + "\n");
@@ -891,7 +991,7 @@ public class AdminDashboardController {
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
-                java.util.List<String> allLines = new java.util.ArrayList<>();
+                List<String> allLines = new ArrayList<>();
                 // Read all lines, skip header
                 if (enrollmentsFile.exists()) {
                     try (BufferedReader br = new BufferedReader(new FileReader(enrollmentsFile))) {
@@ -904,7 +1004,7 @@ public class AdminDashboardController {
                 }
                 // Remove all lines for this student and this term only
                 String sid = student[0];
-                java.util.List<String> filtered = new java.util.ArrayList<>();
+                List<String> filtered = new ArrayList<>();
                 String header = allLines.isEmpty() ? "Student ID,Student Name,Program,Year,Status,Term" : allLines.get(0);
                 filtered.add(header);
                 for (int i = 1; i < allLines.size(); i++) {
@@ -921,7 +1021,7 @@ public class AdminDashboardController {
                 // Add new enrollment for this student for the current term only
                 filtered.add(sid + "," + student[1] + "," + student[7] + "," + student[8] + ",Enrolled," + term);
                 // Write back to enrollments.csv
-                try (java.io.FileWriter fw = new java.io.FileWriter(enrollmentsFile, false)) {
+                try (FileWriter fw = new FileWriter(enrollmentsFile, false)) {
                     for (String line : filtered) {
                         fw.write(line + "\n");
                     }
@@ -936,7 +1036,7 @@ public class AdminDashboardController {
             String newTerm = termBox.getValue();
             availableCourses.clear();
             enrolledCourses.clear();
-            java.util.Set<String> allEnrolledCodes = new java.util.HashSet<>();
+            Set<String> allEnrolledCodes = new HashSet<>();
             if (student[0] != null) {
                 File studentDir = new File("students/" + student[0]);
                 if (studentDir.exists() && studentDir.isDirectory()) {
@@ -980,7 +1080,7 @@ public class AdminDashboardController {
                     } catch (IOException e) { e.printStackTrace(); }
                 }
                 // Collect all enrolled course codes in any term for this student
-                java.util.Set<String> allEnrolledCourseCodesAnyTerm = new java.util.HashSet<>();
+                Set<String> allEnrolledCourseCodesAnyTerm = new HashSet<>();
                 if (student[0] != null) {
                     File studentDir = new File("students/" + student[0]);
                     if (studentDir.exists() && studentDir.isDirectory()) {
@@ -1048,7 +1148,7 @@ public class AdminDashboardController {
         // Load terms and set up initial state
         if (termsFile.exists()) {
             try (BufferedReader br = new BufferedReader(new FileReader(termsFile))) {
-                java.util.List<String> terms = new java.util.ArrayList<>();
+                List<String> terms = new ArrayList<>();
                 br.lines().forEach(terms::add);
                 termBox.getItems().addAll(terms);
                 if (selectedTerm != null && terms.contains(selectedTerm)) {
@@ -1079,8 +1179,10 @@ public class AdminDashboardController {
         acSectionCol.setPrefWidth(80);
         TableColumn<String[], String> acScheduleCol = new TableColumn<>("Schedule");
         acScheduleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 4 ? data.getValue()[4] : ""));
-        acScheduleCol.setPrefWidth(120);
+        acScheduleCol.setMinWidth(120);
+        // Distribute columns normally, only last column expands
         availableCoursesTable.getColumns().setAll(acCodeCol, acNameCol, acUnitsCol, acSectionCol, acScheduleCol);
+        availableCoursesTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         // --- Add search field for available courses ---
         TextField availableCourseSearch = new TextField();
@@ -1112,11 +1214,14 @@ public class AdminDashboardController {
         ecSectionCol.setPrefWidth(80);
         TableColumn<String[], String> ecScheduleCol = new TableColumn<>("Schedule");
         ecScheduleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().length > 4 ? data.getValue()[4] : ""));
-        ecScheduleCol.setPrefWidth(120);
+        ecScheduleCol.setMinWidth(120);
+        // Distribute columns normally, only last column expands
         enrolledCoursesTable.getColumns().setAll(ecCodeCol, ecNameCol, ecUnitsCol, ecSectionCol, ecScheduleCol);
+        enrolledCoursesTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         availableCoursesTable.setItems(filteredAvailableCourses);
         enrolledCoursesTable.setItems(enrolledCourses);
+
 
         availableCoursesTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         enrolledCoursesTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
@@ -1158,7 +1263,17 @@ public class AdminDashboardController {
                     }
                 }
                 if (!enrolledInOtherTerm) {
-                    availableCourses.add(new String[]{course[0], course[1], course.length > 2 ? course[2] : ""});
+                    // Make 'other' 10x smaller and not longer for schedule visualization
+                    String code = course[0];
+                    String name = course[1];
+                    String units = course.length > 2 ? course[2] : "";
+                    // If the name is 'other', shrink it
+                    if (name.trim().equalsIgnoreCase("other")) {
+                        name = "other";
+                        // Make it 10x smaller by using a very short string
+                        name = "o";
+                    }
+                    availableCourses.add(new String[]{code, name, units});
                 }
                 enrolledCourses.remove(course);
             }
@@ -1172,13 +1287,12 @@ public class AdminDashboardController {
         enrollBtn.setOnAction(e -> {
             saveEnrollments.run();
             dialog.close();
-            onEnrollmentsClick(); // Refresh the Enrollments table after closing
+            onEnrollmentsClick();
         });
 
         Button generateGsaBtn = new Button("Generate GSA");
         generateGsaBtn.setOnAction(e -> {
             try {
-                // Generate GSA PDF
                 String pdfPath = "students/" + student[0] + "/" + termBox.getValue() + "/GSA.pdf";
                 new File("students/" + student[0] + "/" + termBox.getValue()).mkdirs();
                 GsaPdfGenerator.generateGsaPdf(
@@ -1187,10 +1301,9 @@ public class AdminDashboardController {
                         "SmartClass University",
                         student,
                         termBox.getValue(),
-                        new java.util.ArrayList<>(enrolledCourses)
+                        new ArrayList<>(enrolledCourses)
                 );
-                // Preview PDF (open with system viewer)
-                java.awt.Desktop.getDesktop().open(new File(pdfPath));
+                Desktop.getDesktop().open(new File(pdfPath));
             } catch (Exception ex) {
                 ex.printStackTrace();
                 Alert alert = new Alert(Alert.AlertType.ERROR, "Failed to generate or preview GSA PDF: " + ex.getMessage());
@@ -1198,40 +1311,83 @@ public class AdminDashboardController {
             }
         });
 
-        Button visualizeBtn = new Button("Visualize Schedule");
-        visualizeBtn.setOnAction(e -> {
-            Stage schedDialog = new Stage();
-            schedDialog.setTitle("Schedule Visualization");
-            schedDialog.initModality(Modality.APPLICATION_MODAL);
+        // --- Schedule Visualization (always visible, not on button) ---
+        VBox scheduleBox = new VBox(12); // increased spacing
+        scheduleBox.setAlignment(Pos.TOP_CENTER);
+        scheduleBox.setPadding(new Insets(16)); // increased padding
+        scheduleBox.setStyle("-fx-background-color: #fff; -fx-border-color: #e0e0e0; -fx-border-radius: 12; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e9ecef, 4, 0.08, 0, 1);");
+        Label schedTitle = new Label("Schedule Visualization");
+        schedTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        scheduleBox.getChildren().add(schedTitle);
 
-            // Days and time slots
+        availableCoursesTable.setStyle("");
+        enrolledCoursesTable.setStyle("");
+
+        // Hide horizontal scroll bars for both tables after layout
+        Runnable hideHorizontalScrollBars = () -> {
+            for (TableView<?> table : new TableView[]{availableCoursesTable, enrolledCoursesTable}) {
+                table.lookupAll(".scroll-bar").forEach(node -> {
+                    if (node instanceof ScrollBar) {
+                        ScrollBar sb = (ScrollBar) node;
+                        if (sb.getOrientation() == Orientation.HORIZONTAL) {
+                            sb.setVisible(false);
+                            sb.setPrefHeight(0);
+                            sb.setMaxHeight(0);
+                        }
+                    }
+                });
+            }
+        };
+        // Run after scene is set
+        javafx.application.Platform.runLater(hideHorizontalScrollBars);
+
+        // --- Total Units Label ---
+        Label totalUnitsLabel = new Label();
+        totalUnitsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #333; -fx-padding: 8 0 0 0;");
+        // Helper to update total units
+        Runnable updateTotalUnits = () -> {
+            int totalUnits = 0;
+            for (String[] course : enrolledCourses) {
+                if (course.length > 2) {
+                    try {
+                        totalUnits += Integer.parseInt(course[2].trim());
+                    } catch (Exception ignored) {}
+                }
+            }
+            totalUnitsLabel.setText("Total Units Taken: " + totalUnits);
+        };
+        // Listen for changes in enrolledCourses
+        enrolledCourses.addListener((ListChangeListener<String[]>) c -> updateTotalUnits.run());
+        // Initial update
+        updateTotalUnits.run();
+
+        // Remove ScrollPane and add grid directly
+        // Make the schedule grid content fit without scrolling
+        Runnable updateScheduleGrid = () -> {
             String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-            int startHour = 7, endHour = 21; // 7:00 to 21:00 (8:00 PM) for a bigger frame
+            int startHour = 7, endHour = 21;
             int numRows = endHour - startHour;
-
             GridPane grid = new GridPane();
-            grid.setPadding(new Insets(16));
+            grid.setPadding(new Insets(8));
             grid.setHgap(4);
-            grid.setVgap(4);
+            grid.setVgap(2);
             grid.setStyle("-fx-background-color: white;");
-
-            // Header row
             grid.add(new Label("Time/Day"), 0, 0);
             for (int d = 0; d < days.length; d++) {
                 Label dayLabel = new Label(days[d]);
-                dayLabel.setStyle("-fx-font-weight: bold;");
+                dayLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11px;");
                 grid.add(dayLabel, d + 1, 0);
             }
-            // Time labels (24-hour format)
             for (int h = 0; h < numRows; h++) {
                 int hour = startHour + h;
                 String timeLabel = String.format("%02d:00-%02d:00", hour, hour + 1);
-                grid.add(new Label(timeLabel), 0, h + 1);
+                Label timeLbl = new Label(timeLabel);
+                timeLbl.setStyle("-fx-font-size: 10px;");
+                grid.add(timeLbl, 0, h + 1);
             }
-            // Fill grid with enrolled courses
             Label[][] cellMatrix = new Label[numRows][days.length];
             int[][] cellCount = new int[numRows][days.length];
-            // First pass: count how many courses occupy each cell
+            // Count conflicts
             for (String[] course : enrolledCourses) {
                 if (course.length < 5) continue;
                 String code = course[0];
@@ -1260,96 +1416,141 @@ public class AdminDashboardController {
                     }
                 }
             }
-            // Second pass: fill grid and color conflicts
-            for (String[] course : enrolledCourses) {
-                if (course.length < 5) continue;
-                String code = course[0];
-                String section = course[3];
-                String sched = course[4];
-                if (sched == null || sched.isEmpty()) continue;
-                String[] parts = sched.split(" ", 3);
-                if (parts.length < 3) continue;
-                String timeRange = parts[0];
-                String room = parts[1].replaceAll("[()]", "");
-                String daysStr = parts[2];
-                String[] schedDays = daysStr.split("/");
-                String[] times = timeRange.split("-");
-                if (times.length != 2) continue;
-                int start = Integer.parseInt(times[0].split(":")[0]);
-                int end = Integer.parseInt(times[1].split(":")[0]);
-                for (String d : schedDays) {
-                    d = d.trim();
-                    for (int col = 0; col < days.length; col++) {
-                        if (days[col].equalsIgnoreCase(d)) {
-                            for (int row = start - startHour; row < end - startHour; row++) {
-                                if (row >= 0 && row < numRows) {
-                                    String labelText = code + " (" + section + ")\n" + room;
-                                    Label cell = new Label(labelText);
-                                    cell.setWrapText(true);
+            // Place cells
+            for (int row = 0; row < numRows; row++) {
+                for (int col = 0; col < days.length; col++) {
+                    boolean hasCourse = false;
+                    String labelText = "";
+                    // Remove border-radius for sharp box edges
+                    String cellStyle = "-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-padding: 2; -fx-font-size: 10px; -fx-border-width: 1; -fx-background-radius: 0; -fx-border-radius: 0;";
+                    for (String[] course : enrolledCourses) {
+                        if (course.length < 5) continue;
+                        String code = course[0];
+                        String section = course[3];
+                        String sched = course[4];
+                        if (sched == null || sched.isEmpty()) continue;
+                        String[] parts = sched.split(" ", 3);
+                        if (parts.length < 3) continue;
+                        String timeRange = parts[0];
+                        String room = parts[1].replaceAll("[()]", "");
+                        String daysStr = parts[2];
+                        String[] schedDays = daysStr.split("/");
+                        String[] times = timeRange.split("-");
+                        if (times.length != 2) continue;
+                        int start = Integer.parseInt(times[0].split(":")[0]);
+                        int end = Integer.parseInt(times[1].split(":")[0]);
+                        for (String d : schedDays) {
+                            d = d.trim();
+                            if (days[col].equalsIgnoreCase(d)) {
+                                if (row >= start - startHour && row < end - startHour) {
+                                    hasCourse = true;
+                                    labelText = code + " (" + section + ")\n" + room;
                                     if (cellCount[row][col] > 1) {
-                                        cell.setStyle("-fx-background-color: #ffcccc; -fx-border-color: #e57373; -fx-padding: 2; -fx-font-size: 11px;");
+                                        cellStyle = "-fx-background-color: #ffcccc; -fx-border-color: #e57373; -fx-padding: 2; -fx-font-size: 10px; -fx-border-width: 1; -fx-background-radius: 0; -fx-border-radius: 0;";
                                     } else {
-                                        cell.setStyle("-fx-background-color: #e0f7fa; -fx-border-color: #b2ebf2; -fx-padding: 2; -fx-font-size: 11px;");
+                                        cellStyle = "-fx-background-color: #e0f7fa; -fx-border-color: #b2ebf2; -fx-padding: 2; -fx-font-size: 10px; -fx-border-width: 1; -fx-background-radius: 0; -fx-border-radius: 0;";
                                     }
-                                    grid.add(cell, col + 1, row + 1);
-                                    cellMatrix[row][col] = cell;
                                 }
                             }
                         }
                     }
+                    Label cell = new Label(labelText);
+                    cell.setWrapText(true);
+                    cell.setPrefWidth(70);
+                    cell.setMinWidth(70);
+                    cell.setMaxWidth(70);
+                    cell.setPrefHeight(22);
+                    cell.setMinHeight(22);
+                    cell.setMaxHeight(22);
+                    cell.setAlignment(Pos.CENTER);
+                    cell.setStyle(cellStyle);
+                    grid.add(cell, col + 1, row + 1);
                 }
             }
-            // Fill empty cells with a light gray box for design
-            for (int row = 0; row < numRows; row++) {
-                for (int col = 0; col < days.length; col++) {
-                    if (cellMatrix[row][col] == null) {
-                        Label emptyCell = new Label("");
-                        emptyCell.setMinHeight(40);
-                        emptyCell.setMinWidth(110);
-                        emptyCell.setPrefHeight(48);
-                        emptyCell.setPrefWidth(110);
-                        emptyCell.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-padding: 2;");
-                        grid.add(emptyCell, col + 1, row + 1);
-                    } else {
-                        // Also set fixed size for course cells
-                        cellMatrix[row][col].setMinHeight(40);
-                        cellMatrix[row][col].setMinWidth(110);
-                        cellMatrix[row][col].setPrefHeight(48);
-                        cellMatrix[row][col].setPrefWidth(110);
-                    }
-                }
+            // Remove previous grid if any, then add new one
+            if (scheduleBox.getChildren().size() > 1) {
+                scheduleBox.getChildren().remove(1, scheduleBox.getChildren().size());
             }
-            ScrollPane scroll = new ScrollPane(grid);
-            scroll.setFitToWidth(true);
-            // Make the window bigger to fit more rows (height and width)
-            Scene schedScene = new Scene(scroll, 900, 650); // Reduced size for better fit
-            schedDialog.setScene(schedScene);
-            schedDialog.showAndWait();
-        });
+            scheduleBox.getChildren().add(grid);
+            VBox.setVgrow(grid, Priority.ALWAYS);
+        };
+        // Update schedule grid whenever enrolledCourses changes or term changes
+        enrolledCourses.addListener((ListChangeListener<String[]>) c -> updateScheduleGrid.run());
+        termBox.valueProperty().addListener((obs, oldVal, newVal) -> updateScheduleGrid.run());
+        // Initial schedule grid
+        updateScheduleGrid.run();
 
-        VBox leftBox = new VBox(8, new Label("Available Courses"), availableCourseSearch, availableCoursesTable, addCourseBtn);
-        VBox rightBox = new VBox(8, new Label("Enrolled Courses"), enrolledCoursesTable, removeCourseBtn);
-        leftBox.setAlignment(Pos.TOP_CENTER);
-        rightBox.setAlignment(Pos.TOP_CENTER);
-        HBox tablesBox = new HBox(24, leftBox, rightBox);
-        tablesBox.setAlignment(Pos.CENTER);
-
-        root.getChildren().addAll(
+        // --- Info Card (Student, Program, Term) ---
+        VBox infoBox = new VBox(10,
                 titleLabel,
                 studentLabel,
                 programLabel,
                 new Label("Term:"),
-                termBox,
-                tablesBox,
-                enrollBtn,
-                generateGsaBtn,
-                visualizeBtn
+                termBox
         );
+        infoBox.setPadding(new Insets(16));
+        infoBox.setStyle("-fx-background-color: #fff; -fx-border-color: #e0e0e0; -fx-border-radius: 12; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e9ecef, 4, 0.08, 0, 1);");
+        infoBox.setPrefWidth(420);
 
-        Scene scene = new Scene(root, 800, 600);
+        // --- Available Courses Card ---
+        VBox availableCard = new VBox(10,
+                new Label("Available Courses"),
+                availableCourseSearch,
+                availableCoursesTable,
+                addCourseBtn
+        );
+        availableCard.setPadding(new Insets(16));
+        availableCard.setStyle("-fx-background-color: #fff; -fx-border-color: #e0e0e0; -fx-border-radius: 12; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e9ecef, 4, 0.08, 0, 1);");
+        availableCoursesTable.setPrefHeight(260);
+        availableCoursesTable.setPrefWidth(900);
+        availableCard.setPrefWidth(900);
+
+        // --- Enrolled Courses Card ---
+        VBox enrolledCard = new VBox(10,
+                new Label("Enrolled Courses"),
+                enrolledCoursesTable,
+                removeCourseBtn
+        );
+        enrolledCard.setPadding(new Insets(16));
+        enrolledCard.setStyle("-fx-background-color: #fff; -fx-border-color: #e0e0e0; -fx-border-radius: 12; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e9ecef, 4, 0.08, 0, 1);");
+        enrolledCoursesTable.setPrefHeight(260);
+        enrolledCoursesTable.setPrefWidth(900);
+        enrolledCard.setPrefWidth(900);
+
+        VBox bottomCards = new VBox(18, availableCard, enrolledCard);
+        bottomCards.setAlignment(Pos.CENTER);
+        bottomCards.setPrefWidth(900);
+
+        VBox leftColumn = new VBox(18, infoBox, bottomCards, new HBox(12, enrollBtn, generateGsaBtn));
+        leftColumn.setAlignment(Pos.TOP_CENTER);
+        leftColumn.setPrefWidth(700); // slightly smaller left column
+        leftColumn.setMaxWidth(700);
+
+        VBox scheduleBoxWrapper = new VBox(scheduleBox, totalUnitsLabel);
+        scheduleBoxWrapper.setAlignment(Pos.TOP_CENTER);
+        scheduleBoxWrapper.setPrefWidth(600);
+        scheduleBoxWrapper.setMaxWidth(600);
+        // Also update the scheduleBox and schedScroll size
+        scheduleBox.setPrefWidth(600);
+
+        HBox mainBox = new HBox(24, leftColumn, scheduleBoxWrapper); // more space between columns
+        mainBox.setAlignment(Pos.TOP_CENTER); // Center the schedule visualization
+        mainBox.setPadding(new Insets(16, 16, 16, 16));
+        mainBox.setPrefHeight(800);
+        mainBox.setPrefWidth(1100);
+
+        root.getChildren().clear();
+        root.getChildren().add(mainBox);
+
+        // Set the root VBox as the Scene's root before showing dialog
+        Scene scene = new Scene(root, 1400, 800); // wider window
         dialog.setScene(scene);
-        dialog.sizeToScene();
-        dialog.setResizable(false);
+        // Set dialog size to be a bit larger than admin but not full screen
+        dialog.setMaximized(false);
+        dialog.setWidth(1450); // wider dialog
+        dialog.setHeight(850);
+        dialog.setResizable(true);
+        dialog.centerOnScreen();
         dialog.showAndWait();
     }
 

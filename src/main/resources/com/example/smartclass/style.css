@@ -31,3 +31,32 @@
 .side-button:hover {
     -fx-background-color: #dcdde1;
 }
+
+.enroll-card {
+    -fx-background-color: #f9f9f9;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);
+}
+
+.enroll-card-no-radius {
+    -fx-background-color: #f9f9f9;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+    -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);
+}
+
+.enroll-tabpane {
+    -fx-background-color: #fff;
+    -fx-tab-min-height: 36px;
+    -fx-tab-max-height: 36px;
+    -fx-font-size: 15px;
+    -fx-font-family: 'Segoe UI', Arial, sans-serif;
+    -fx-border-color: transparent;
+}
+
+.enroll-tab-content-bg {
+    -fx-background-color: #f3f6fa;
+}

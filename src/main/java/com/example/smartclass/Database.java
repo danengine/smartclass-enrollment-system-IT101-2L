@@ -53,18 +53,29 @@ public class Database {
                 }
 
                 String[] data = line.trim().split(",");
-                if (data.length >= 9) {
+                if (data.length >= 19) {
                     Student student = new Student(
-                            data[0].trim(),
-                            data[1].trim(),
-                            data[2].trim(),
-                            data[3].trim(),
-                            data[4].trim(),
-                            data[5].trim(),
-                            data[6].trim(),
-                            data[7].trim(),
-                            data[8].trim(),
-                            data[9].trim()
+                        data[0].trim(), // studentId
+                        data[1].trim(), // lrn
+                        data[2].trim(), // name
+                        data[3].trim(), // suffix
+                        data[4].trim(), // email
+                        data[5].trim(), // gender
+                        data[6].trim(), // address
+                        data[7].trim(), // contactNumber
+                        data[8].trim(), // course
+                        data[9].trim(), // year
+                        data[10].trim(), // dateEnrolled
+                        data[11].trim(), // fatherName
+                        data[12].trim(), // fatherContact
+                        data[13].trim(), // motherName
+                        data[14].trim(), // motherContact
+                        data[15].trim(), // guardianName
+                        data[16].trim(), // guardianContact
+                        Boolean.parseBoolean(data[17].trim()), // birthCertSubmitted
+                        Boolean.parseBoolean(data[18].trim()), // form137Submitted
+                        Boolean.parseBoolean(data[19].trim()), // goodMoralSubmitted
+                        Boolean.parseBoolean(data[20].trim())  // medCertSubmitted
                     );
                     students.add(student);
                 }

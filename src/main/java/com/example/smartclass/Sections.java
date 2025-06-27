@@ -9,9 +9,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TextFieldTableCell;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -21,14 +19,35 @@ import java.util.List;
 
 public class Sections {
 
-    public static VBox SectionsOpen() {
-        VBox layout = new VBox(16);
-        layout.setPadding(new Insets(20));
-        layout.setStyle("-fx-background-color: white;");
+    public static StackPane SectionsOpen() {
+        // --- Card Layout for Section List (copied from onEnrollmentsClick) ---
+        StackPane rootPane = new StackPane();
+        rootPane.setStyle("-fx-background-color: #f4f6f7;");
 
-        // --- Term Dropdown for Filtering ---
+        VBox outerVBox = new VBox(20);
+        outerVBox.setAlignment(Pos.TOP_CENTER);
+        outerVBox.setStyle("-fx-padding: 36 32 36 32;");
+
+        VBox card = new VBox(16);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 12; -fx-border-color: #dcdde1; -fx-border-radius: 12; -fx-padding: 24 24 24 24; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 12, 0, 0, 4);");
+
+        // Title
+        HBox titleBox = new HBox(12);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        Label titleLabel = new Label("📚 Section List");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        titleBox.getChildren().add(titleLabel);
+
+        // Filters (Term ComboBox + Search)
+        HBox filterBox = new HBox(10);
+        filterBox.setAlignment(Pos.CENTER_LEFT);
+        Label filterLabel = new Label("Filter by:");
+        filterLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #636e72;");
         ComboBox<String> termBox = new ComboBox<>();
-        termBox.setPromptText("Select Term");
+        termBox.setPromptText("Term");
+        termBox.setPrefWidth(140);
+        termBox.setStyle("-fx-background-radius: 8; -fx-font-size: 13px;");
         File termsFile = new File("terms.csv");
         ObservableList<String> terms = FXCollections.observableArrayList();
         int defaultIndex = 0;
@@ -44,15 +63,28 @@ public class Sections {
         }
         termBox.setItems(terms);
         if (!terms.isEmpty()) {
-            termBox.setValue(terms.get(defaultIndex)); // Set latest term as default
+            termBox.setValue(terms.get(defaultIndex));
         }
-
-        // --- Search Field for Filtering ---
         TextField searchField = new TextField();
         searchField.setPromptText("Search section, course, program, or schedule...");
         searchField.setPrefWidth(220);
+        searchField.setStyle("-fx-background-radius: 8; -fx-padding: 6 10;");
+        Region filterSpacer = new Region();
+        HBox.setHgrow(filterSpacer, Priority.ALWAYS);
+        filterBox.getChildren().addAll(filterLabel, termBox, searchField, filterSpacer);
 
-        // --- Table of Sections ---
+        // --- Action Buttons (top right, like Enroll Student) ---
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        Button createSectionBtn = new Button("+ Create Section");
+        createSectionBtn.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 6 18;");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 18;");
+        Button autoScheduleBtn = new Button("AI Auto Schedule");
+        autoScheduleBtn.setStyle("-fx-background-color: #00b894; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 18;");
+        buttonBox.getChildren().addAll(createSectionBtn, deleteBtn, autoScheduleBtn);
+
+        // --- Table of Sections (original logic, untouched) ---
         TableView<String[]> sectionTable = new TableView<>();
         sectionTable.setPrefHeight(320);
         sectionTable.setPrefWidth(700);
@@ -156,7 +188,6 @@ public class Sections {
         });
 
         // --- Create Section Button ---
-        Button createSectionBtn = new Button("+ Create Section");
         int finalDefaultIndex = defaultIndex;
         createSectionBtn.setOnAction(e -> {
             // Popup dialog for section creation
@@ -169,7 +200,8 @@ public class Sections {
 
             ComboBox<String> termSelect = new ComboBox<>(terms);
             termSelect.setPromptText("Select Term");
-            if (!terms.isEmpty()) termSelect.setValue(terms.get(finalDefaultIndex));
+            int localDefaultIndex = finalDefaultIndex; // Fix: use local variable for default index
+            if (!terms.isEmpty()) termSelect.setValue(terms.get(localDefaultIndex));
 
             ComboBox<String> programBox = new ComboBox<>();
             programBox.setPromptText("Select Program");
@@ -606,7 +638,6 @@ public class Sections {
         sectionTable.getColumns().removeIf(col -> "Delete".equals(col.getText()));
 
         // --- Auto Schedule All Button ---
-        Button autoScheduleBtn = new Button("Auto Schedule All");
         autoScheduleBtn.setOnAction(e -> {
             loadingOverlay.setVisible(true);
             autoScheduleBtn.setDisable(true);
@@ -792,8 +823,7 @@ public class Sections {
         });
 
         // --- Mass Delete Button ---
-        Button massDeleteBtn = new Button("Delete Selected");
-        massDeleteBtn.setOnAction(e -> {
+        deleteBtn.setOnAction(e -> {
             ObservableList<String[]> selected = sectionTable.getSelectionModel().getSelectedItems();
             if (selected.isEmpty()) return;
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Delete selected sections?", ButtonType.YES, ButtonType.NO);
@@ -825,12 +855,15 @@ public class Sections {
             });
         });
 
-        HBox topBar = new HBox(10, new Label("Term:"), termBox, searchField, createSectionBtn, massDeleteBtn, autoScheduleBtn);
-        layout.getChildren().addAll(topBar, new Label("Sections List"), tableStack);
-        return layout;
+        // Add all to card (title, filter, table, then buttons at the end)
+        StackPane tableWithLoading = new StackPane(sectionTable, loadingOverlay);
+        card.getChildren().addAll(titleBox, filterBox, tableWithLoading, buttonBox);
+        outerVBox.getChildren().add(card);
+        rootPane.getChildren().add(outerVBox);
+        return rootPane;
     }
 
-    // Helper method for schedule days
+    // Helper method forS schedule days
     public static String getScheduleDays(String startDay, int units) {
         String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
         int idx = -1;

@@ -30,7 +30,7 @@ public class LoginController {
 
         if (Database.validateCredentials(username, password)) {
             errorLabel.setVisible(false);
-            showLoading(true); // Optional animation
+            showLoading(true);
 
             PauseTransition pause = new PauseTransition(Duration.seconds(1));
             pause.setOnFinished(event -> {
@@ -48,8 +48,7 @@ public class LoginController {
             });
             pause.play();
         } else {
-            errorLabel.setText("Invalid username or password.");
-            errorLabel.setVisible(true);
+            StudentsController.showLogoAlert("The username or password you entered is incorrect. Please try again.", Alert.AlertType.WARNING);
         }
     }
 

@@ -1,37 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Region?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="500" prefWidth="800" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.smartclass.StudentsController">
+<AnchorPane prefHeight="500" prefWidth="800"
+            xmlns="http://javafx.com/javafx/23.0.1"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.example.smartclass.StudentsController">
 
-    <VBox spacing="10" AnchorPane.leftAnchor="10" AnchorPane.rightAnchor="10" AnchorPane.topAnchor="10">
+    <StackPane style="-fx-background-color: #f4f6f7;"
+               AnchorPane.topAnchor="0" AnchorPane.bottomAnchor="0"
+               AnchorPane.leftAnchor="0" AnchorPane.rightAnchor="0">
 
-        <HBox alignment="CENTER_LEFT" spacing="10">
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;" text="📋 Students List" />
+        <VBox alignment="TOP_CENTER" spacing="20" style="-fx-padding: 36 32 36 32;">
 
-            <Region HBox.hgrow="ALWAYS" />
-            <TextField fx:id="searchField" prefWidth="200" promptText="Search..." />
-        </HBox>
+            <!-- Single Card: Student Info -->
+            <VBox spacing="16" alignment="TOP_LEFT"
+                  style="-fx-background-color: #ffffff; -fx-background-radius: 12;
+                         -fx-border-color: #dcdde1; -fx-border-radius: 12;
+                         -fx-padding: 24 24 24 24; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 12, 0, 0, 4);">
 
-        <TableView fx:id="studentsTable" prefHeight="400">
-            <columns>
-                <TableColumn fx:id="idColumn" text="Student ID" />
-                <TableColumn fx:id="nameColumn" text="Name" />
-                <TableColumn fx:id="courseColumn" text="Course" />
-                <TableColumn fx:id="yearColumn" text="Year" />
-                <TableColumn fx:id="enrolledDateColumn" text="Date Enrolled" />
-                <TableColumn fx:id="actionColumn" text="Actions" />
-            </columns>
-        </TableView>
-        <Button onAction="#onEnrollUser" prefWidth="150" text="New Student" />
-        <Button onAction="#onExportCSV" prefWidth="150" text="Export to CSV" />
-    </VBox>
+                <!-- Title -->
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label text="📋 Student Information"
+                           style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;" />
+                </HBox>
+
+                <!-- Filters -->
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label text="Filter by:" style="-fx-font-size: 14px; -fx-text-fill: #636e72;" />
+                    <ComboBox fx:id="filterProgramCombo" promptText="Program" prefWidth="140"
+                              style="-fx-background-radius: 8; -fx-font-size: 13px;" />
+                    <ComboBox fx:id="filterYearCombo" promptText="Year" prefWidth="120"
+                              style="-fx-background-radius: 8; -fx-font-size: 13px;" />
+                    <DatePicker fx:id="filterEnrolledDatePicker" promptText="Enrolled Date" prefWidth="140"
+                                style="-fx-background-radius: 8; -fx-font-size: 13px;" />
+                    <TextField fx:id="searchField" prefWidth="220"
+                               promptText="Search student..."
+                               style="-fx-background-radius: 8; -fx-padding: 6 10;" />
+                    <Region HBox.hgrow="ALWAYS" />
+                </HBox>
+
+                <!-- Table View -->
+                <TableView fx:id="studentsTable" prefHeight="340"
+                           style="-fx-background-radius: 0;">
+                    <columns>
+                        <TableColumn fx:id="idColumn" text="ID" />
+                        <TableColumn fx:id="nameColumn" text="Full Name" />
+                        <TableColumn fx:id="courseColumn" text="Course" />
+                        <TableColumn fx:id="yearColumn" text="Year" />
+                        <TableColumn fx:id="enrolledDateColumn" text="Enrolled On" />
+                        <TableColumn fx:id="actionColumn" text="Action" />
+                    </columns>
+                </TableView>
+
+                <!-- Buttons -->
+                <HBox spacing="10" alignment="CENTER_RIGHT">
+                    <Region HBox.hgrow="ALWAYS" />
+                    <Button onAction="#onEnrollUser" prefWidth="140" text="➕ Enroll Student"
+                            style="-fx-background-color: #0984e3; -fx-text-fill: white;
+                                   -fx-background-radius: 8; -fx-font-weight: bold;" />
+                    <Button onAction="#onExportCSV" prefWidth="140" text="📁 Export CSV"
+                            style="-fx-background-color: #636e72; -fx-text-fill: white;
+                                   -fx-background-radius: 8; -fx-font-weight: bold;" />
+                </HBox>
+
+            </VBox>
+        </VBox>
+    </StackPane>
 </AnchorPane>
