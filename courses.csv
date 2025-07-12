@@ -2,30 +2,93 @@ Program,Section,CourseCode,CourseName,Units,Term,ScheduleBSCS,A121,CS101,Introdu
 BSCS,A121,CS110-1,Discrete Structures 1,3,2nd Term | 2024-2025,11:00-12:00 (R103) Wednesday/Friday
 BSCS,A121,IT101-1,Computer Programming Concepts 1),2,2nd Term | 2024-2025,09:00-10:00 (R104) Monday/Wednesday
 BSCS,A121,IT101-1L,Computer Programming Concepts 1 (LAB),1,2nd Term | 2024-2025,12:00-13:00 (R105) N/A
-BSCS,A121,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R101) Monday/Wednesday
-BSCS,A121,CS101L,Introduction to Computer Systems (LAB),1,1st Term 2024-2025,08:00-09:00 (R102) Monday
-BSCS,A121,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R103) Tuesday/Thursday/Saturday
-BSCS,A121,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R104) Monday/Wednesday/Friday
-BSCS,A121,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R105) Tuesday/Thursday/Saturday
-BSCS,A121,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R101) Monday/Wednesday/Friday
-BSCS,A121,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R102) Tuesday/Thursday
-BSCS,A121,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R103) Monday/Wednesday/Friday
-BSCS,A121,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R104) Tuesday
-BSCS,A122,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R105) Tuesday/Thursday
-BSCS,A122,CS101L,Introduction to Computer Systems (LAB),1,1st Term 2024-2025,08:00-09:00 (R101) Tuesday
-BSCS,A122,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R102) Monday/Wednesday/Friday
-BSCS,A122,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R103) Tuesday/Thursday/Saturday
-BSCS,A122,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R104) Monday/Wednesday/Friday
-BSCS,A122,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R105) Tuesday/Thursday/Saturday
-BSCS,A122,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R101) Monday/Wednesday
-BSCS,A122,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R102) Tuesday/Thursday/Saturday
-BSCS,A122,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R103) Monday
-BSCS,A123,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R104) Wednesday/Friday
-BSCS,A123,CS101L,Introduction to Computer Systems (LAB),1,1st Term 2024-2025,08:00-09:00 (R105) Wednesday
-BSCS,A123,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R101) Tuesday/Thursday/Saturday
-BSCS,A123,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R102) Monday/Wednesday/Friday
-BSCS,A123,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R103) Tuesday/Thursday/Saturday
-BSCS,A123,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R104) Monday/Wednesday/Friday
-BSCS,A123,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R105) Wednesday/Friday
-BSCS,A123,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R101) Monday/Wednesday/Friday
-BSCS,A123,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R102) Wednesday
+BSIS,A121,CS110-1,Discrete Structures 1,3,2nd Term 2024-2025,07:00-08:00 (R101) Monday/Wednesday/Friday
+BSIS,A121,IT101-1,Computer Programming Concepts 1),2,2nd Term 2024-2025,08:00-09:00 (R101) Monday/Wednesday
+BSIS,A121,IT101-1L,Computer Programming Concepts 1 (Lab),1,2nd Term 2024-2025,09:00-10:00 (R101) Monday
+BSIS,A121,MATH022,Linear Algebra,3,2nd Term 2024-2025,10:00-11:00 (R102) Monday/Wednesday/Friday
+BSIS,A121,ENG024,Writing for Academic Studies,3,2nd Term 2024-2025,07:00-08:00 (R103) Tuesday/Thursday/Saturday
+BSIS,A121,SS022,Readings in Philippine History,3,2nd Term 2024-2025,08:00-09:00 (R103) Tuesday/Thursday/Saturday
+BSIS,A121,PE001,Physical Activities Toward Health and Fitness 1,2,2nd Term 2024-2025,10:00-11:00 (R103) Tuesday/Thursday
+BSIS,A121,NSTP011P,National Service Training Program 2,3,2nd Term 2024-2025,11:00-12:00 (R103) Tuesday/Thursday/Saturday
+BSIS,A121,VE022,Life Coaching Series 2,1,2nd Term 2024-2025,12:00-13:00 (R103) Tuesday
+BSIS,A122,CS110-1,Discrete Structures 1,3,2nd Term 2024-2025,07:00-08:00 (R102) Tuesday/Thursday/Saturday
+BSIS,A122,IT101-1,Computer Programming Concepts 1),2,2nd Term 2024-2025,08:00-09:00 (R102) Tuesday/Thursday
+BSIS,A122,IT101-1L,Computer Programming Concepts 1 (Lab),1,2nd Term 2024-2025,09:00-10:00 (R102) Tuesday
+BSIS,A122,MATH022,Linear Algebra,3,2nd Term 2024-2025,10:00-11:00 (R104) Tuesday/Thursday/Saturday
+BSIS,A122,ENG024,Writing for Academic Studies,3,2nd Term 2024-2025,07:00-08:00 (R105) Monday/Wednesday/Friday
+BSIS,A122,SS022,Readings in Philippine History,3,2nd Term 2024-2025,08:00-09:00 (R105) Monday/Wednesday/Friday
+BSIS,A122,PE001,Physical Activities Toward Health and Fitness 1,2,2nd Term 2024-2025,10:00-11:00 (R105) Monday/Wednesday
+BSIS,A122,NSTP011P,National Service Training Program 2,3,2nd Term 2024-2025,11:00-12:00 (R105) Monday/Wednesday/Friday
+BSIS,A122,VE022,Life Coaching Series 2,1,2nd Term 2024-2025,12:00-13:00 (R105) Monday
+BSIS,A123,CS110-1,Discrete Structures 1,3,2nd Term 2024-2025,09:00-10:00 (R101) Tuesday/Thursday/Saturday
+BSIS,A123,IT101-1,Computer Programming Concepts 1),2,2nd Term 2024-2025,10:00-11:00 (R101) Tuesday/Thursday
+BSIS,A123,IT101-1L,Computer Programming Concepts 1 (Lab),1,2nd Term 2024-2025,11:00-12:00 (R101) Tuesday
+BSIS,A123,MATH022,Linear Algebra,3,2nd Term 2024-2025,12:00-13:00 (R102) Tuesday/Thursday/Saturday
+BSIS,A123,ENG024,Writing for Academic Studies,3,2nd Term 2024-2025,09:00-10:00 (R103) Monday/Wednesday/Friday
+BSIS,A123,SS022,Readings in Philippine History,3,2nd Term 2024-2025,10:00-11:00 (R103) Monday/Wednesday/Friday
+BSIS,A123,PE001,Physical Activities Toward Health and Fitness 1,2,2nd Term 2024-2025,12:00-13:00 (R103) Monday/Wednesday
+BSIS,A123,NSTP011P,National Service Training Program 2,3,2nd Term 2024-2025,13:00-14:00 (R103) Monday/Wednesday/Friday
+BSIS,A123,VE022,Life Coaching Series 2,1,2nd Term 2024-2025,14:00-15:00 (R103) Monday
+BSCS,A121,CS101,Introduction to Computer Systems,2,3rd Term 2024-2025,07:00-08:00 (R101) Monday/Tuesday
+BSCS,A121,CS101L,Introduction to Computer Systems (LAB),1,3rd Term 2024-2025,08:00-09:00 (R102) Monday
+BSCS,A121,MATH021,College Mathematics,3,3rd Term 2024-2025,09:00-10:00 (R103) Monday/Wednesday/Friday
+BSCS,A121,ENG023,Receptive Communication Skills,3,3rd Term 2024-2025,10:00-11:00 (R104) Monday/Wednesday/Friday
+BSCS,A121,SS021,Understanding The Self,3,3rd Term 2024-2025,11:00-12:00 (R105) Monday/Wednesday/Friday
+BSCS,A121,HUM034,Art Appreciation,3,3rd Term 2024-2025,13:00-14:00 (R101) Tuesday/Thursday/Saturday
+BSCS,A121,PE001,Physical Activities Toward Health and Fitness 1,2,3rd Term 2024-2025,14:00-15:00 (R102) Tuesday/Thursday
+BSCS,A121,NSTP010,National Service Training Program 1,3,3rd Term 2024-2025,15:00-16:00 (R103) Tuesday/Thursday/Saturday
+BSCS,A121,VE021,Life Coaching Series 1,1,3rd Term 2024-2025,16:00-17:00 (R104) Tuesday
+BSCS,A122,CS101,Introduction to Computer Systems,2,3rd Term 2024-2025,08:00-09:00 (R105) Monday/Wednesday
+BSCS,A122,CS101L,Introduction to Computer Systems (LAB),1,3rd Term 2024-2025,09:00-10:00 (R101) Monday
+BSCS,A122,MATH021,College Mathematics,3,3rd Term 2024-2025,10:00-11:00 (R102) Monday/Wednesday/Friday
+BSCS,A122,ENG023,Receptive Communication Skills,3,3rd Term 2024-2025,11:00-12:00 (R103) Monday/Wednesday/Friday
+BSCS,A122,SS021,Understanding The Self,3,3rd Term 2024-2025,13:00-14:00 (R104) Monday/Wednesday/Friday
+BSCS,A122,HUM034,Art Appreciation,3,3rd Term 2024-2025,14:00-15:00 (R105) Tuesday/Thursday/Saturday
+BSCS,A122,PE001,Physical Activities Toward Health and Fitness 1,2,3rd Term 2024-2025,15:00-16:00 (R101) Tuesday/Thursday
+BSCS,A122,NSTP010,National Service Training Program 1,3,3rd Term 2024-2025,16:00-17:00 (R102) Tuesday/Thursday/Saturday
+BSCS,A122,VE021,Life Coaching Series 1,1,3rd Term 2024-2025,17:00-18:00 (R103) Tuesday
+BSCS,A123,CS101,Introduction to Computer Systems,2,3rd Term 2024-2025,07:00-08:00 (R104) Wednesday/Thursday
+BSCS,A123,CS101L,Introduction to Computer Systems (LAB),1,3rd Term 2024-2025,08:00-09:00 (R105) Wednesday
+BSCS,A123,MATH021,College Mathematics,3,3rd Term 2024-2025,09:00-10:00 (R101) Tuesday/Thursday/Saturday
+BSCS,A123,ENG023,Receptive Communication Skills,3,3rd Term 2024-2025,10:00-11:00 (R102) Tuesday/Thursday/Saturday
+BSCS,A123,SS021,Understanding The Self,3,3rd Term 2024-2025,11:00-12:00 (R103) Tuesday/Thursday/Saturday
+BSCS,A123,HUM034,Art Appreciation,3,3rd Term 2024-2025,13:00-14:00 (R104) Monday/Wednesday/Friday
+BSCS,A123,PE001,Physical Activities Toward Health and Fitness 1,2,3rd Term 2024-2025,14:00-15:00 (R105) Monday/Friday
+BSCS,A123,NSTP010,National Service Training Program 1,3,3rd Term 2024-2025,15:00-16:00 (R101) Monday/Wednesday/Friday
+BSCS,A123,VE021,Life Coaching Series 1,1,3rd Term 2024-2025,16:00-17:00 (R102) Monday
+BSCS,A124,CS101,Introduction to Computer Systems,2,3rd Term 2024-2025,08:00-09:00 (R103) Tuesday/Friday
+BSCS,A124,CS101L,Introduction to Computer Systems (LAB),1,3rd Term 2024-2025,09:00-10:00 (R104) Tuesday
+BSCS,A124,MATH021,College Mathematics,3,3rd Term 2024-2025,10:00-11:00 (R105) Tuesday/Thursday/Saturday
+BSCS,A124,ENG023,Receptive Communication Skills,3,3rd Term 2024-2025,11:00-12:00 (R101) Tuesday/Thursday/Saturday
+BSCS,A124,SS021,Understanding The Self,3,3rd Term 2024-2025,13:00-14:00 (R102) Tuesday/Thursday/Saturday
+BSCS,A124,HUM034,Art Appreciation,3,3rd Term 2024-2025,14:00-15:00 (R103) Monday/Wednesday/Friday
+BSCS,A124,PE001,Physical Activities Toward Health and Fitness 1,2,3rd Term 2024-2025,15:00-16:00 (R104) Wednesday/Friday
+BSCS,A124,NSTP010,National Service Training Program 1,3,3rd Term 2024-2025,16:00-17:00 (R105) Monday/Wednesday/Friday
+BSCS,A124,VE021,Life Coaching Series 1,1,3rd Term 2024-2025,17:00-18:00 (R101) Wednesday
+BSIS,A121,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R101) Monday/Wednesday
+BSIS,A121,CS101L,Introduction to Computer Systems (Lab),1,1st Term 2024-2025,08:00-09:00 (R101) Monday
+BSIS,A121,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R101) Tuesday/Thursday/Saturday
+BSIS,A121,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R102) Tuesday/Thursday/Saturday
+BSIS,A121,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R102) Monday/Wednesday/Friday
+BSIS,A121,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R103) Monday/Wednesday/Friday
+BSIS,A121,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R103) Tuesday/Thursday
+BSIS,A121,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R104) Monday/Wednesday/Friday
+BSIS,A121,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R104) Monday
+BSIS,A122,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R102) Tuesday/Thursday
+BSIS,A122,CS101L,Introduction to Computer Systems (Lab),1,1st Term 2024-2025,08:00-09:00 (R102) Tuesday
+BSIS,A122,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R103) Monday/Wednesday/Friday
+BSIS,A122,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R104) Monday/Wednesday/Friday
+BSIS,A122,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R101) Tuesday/Thursday/Saturday
+BSIS,A122,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R102) Tuesday/Thursday/Saturday
+BSIS,A122,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R103) Monday/Wednesday
+BSIS,A122,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R104) Tuesday/Thursday/Saturday
+BSIS,A122,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R101) Tuesday
+BSIS,A123,CS101,Introduction to Computer Systems,2,1st Term 2024-2025,07:00-08:00 (R103) Friday/Saturday
+BSIS,A123,CS101L,Introduction to Computer Systems (Lab),1,1st Term 2024-2025,08:00-09:00 (R103) Friday
+BSIS,A123,MATH021,College Mathematics,3,1st Term 2024-2025,09:00-10:00 (R104) Tuesday/Thursday/Friday
+BSIS,A123,ENG023,Receptive Communication Skills,3,1st Term 2024-2025,10:00-11:00 (R101) Tuesday/Thursday/Friday
+BSIS,A123,SS021,Understanding the Self,3,1st Term 2024-2025,11:00-12:00 (R103) Monday/Wednesday/Saturday
+BSIS,A123,HUM034,Art Appreciation,3,1st Term 2024-2025,13:00-14:00 (R104) Monday/Wednesday/Saturday
+BSIS,A123,PE001,Physical Activities Toward Health and Fitness 1,2,1st Term 2024-2025,14:00-15:00 (R101) Friday/Saturday
+BSIS,A123,NSTP010,National Service Training Program 1,3,1st Term 2024-2025,15:00-16:00 (R102) Monday/Wednesday/Saturday
+BSIS,A123,VE021,Life Coaching Series 1,1,1st Term 2024-2025,16:00-17:00 (R102) Monday

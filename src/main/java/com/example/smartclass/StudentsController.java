@@ -8,8 +8,10 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,6 +31,8 @@ public class StudentsController {
     @FXML private ComboBox<String> filterProgramCombo;
     @FXML private ComboBox<String> filterYearCombo;
     @FXML private DatePicker filterEnrolledDatePicker;
+    @FXML private CheckBox showArchivedCheckBox;
+    private FilteredList<Student> filteredList;
 
     private ObservableList<Student> masterList;
 
@@ -42,9 +46,7 @@ public class StudentsController {
         studentsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         masterList = Database.loadStudentsFromCSV("students.csv");
-        // No need to skip the first line, students.csv does not have column headers
-
-        FilteredList<Student> filteredList = new FilteredList<>(masterList, p -> true);
+        filteredList = new FilteredList<>(masterList, p -> true);
 
         // Initialize filter controls
         filterProgramCombo.getItems().add(0, "All Programs");
@@ -54,29 +56,31 @@ public class StudentsController {
         filterYearCombo.setValue("All Years");
         filterEnrolledDatePicker.setValue(null);
 
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            filteredList.setPredicate(student -> {
-                if (newVal == null || newVal.isEmpty()) return true;
-                String filter = newVal.toLowerCase();
-                return student.getStudentId().toLowerCase().contains(filter) ||
-                        student.getName().toLowerCase().contains(filter) ||
-                        student.getCourse().toLowerCase().contains(filter);
-            });
-        });
+        // Add showArchivedCheckBox for filtering archived students
+        if (showArchivedCheckBox == null) {
+            showArchivedCheckBox = new CheckBox("Show Archived");
+            ((VBox) studentsTable.getParent()).getChildren().add(showArchivedCheckBox);
+        }
+        showArchivedCheckBox.setSelected(false);
+        showArchivedCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter());
 
-        filterProgramCombo.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter(filteredList));
-        filterYearCombo.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter(filteredList));
-        filterEnrolledDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter(filteredList));
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter());
+
+        filterProgramCombo.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter());
+        filterYearCombo.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter());
+        filterEnrolledDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> updateStudentFilter());
 
         studentsTable.setItems(filteredList);
         addActionButtons();
+        updateStudentFilter(); // Ensure filter is applied on first load
     }
 
-    private void updateStudentFilter(FilteredList<Student> filteredList) {
+    private void updateStudentFilter() {
         String selectedProgram = filterProgramCombo.getValue();
         String selectedYear = filterYearCombo.getValue();
         LocalDate selectedDate = filterEnrolledDatePicker.getValue();
         String search = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
+        boolean showArchived = showArchivedCheckBox != null && showArchivedCheckBox.isSelected();
         filteredList.setPredicate(student -> {
             boolean matchesSearch = search.isEmpty() ||
                     student.getStudentId().toLowerCase().contains(search) ||
@@ -85,60 +89,72 @@ public class StudentsController {
             boolean matchesProgram = selectedProgram == null || selectedProgram.equals("All Programs") || student.getCourse().equals(selectedProgram);
             boolean matchesYear = selectedYear == null || selectedYear.equals("All Years") || student.getYear().equals(selectedYear);
             boolean matchesDate = selectedDate == null || student.getDateEnrolled().equals(selectedDate.toString());
-            return matchesSearch && matchesProgram && matchesYear && matchesDate;
+            boolean matchesArchived = showArchived || !student.isArchived();
+            return matchesSearch && matchesProgram && matchesYear && matchesDate && matchesArchived;
         });
     }
 
     private void addActionButtons() {
         actionColumn.setCellFactory(col -> new TableCell<>() {
             private final Button editBtn = new Button("Edit");
-            private final Button deleteBtn = new Button("Delete");
-
+            private final Button archiveBtn = new Button();
             {
                 editBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11;");
-                deleteBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11;");
+                archiveBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-size: 11;");
 
                 editBtn.setOnAction(e -> {
                     Student student = getTableView().getItems().get(getIndex());
                     openStudentDialog(student);
                 });
 
-                deleteBtn.setOnAction(e -> {
+                archiveBtn.setOnAction(e -> {
                     Student student = getTableView().getItems().get(getIndex());
-                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to delete this student?", ButtonType.YES, ButtonType.NO);
-                    confirm.setHeaderText("Delete Student");
+                    boolean isArchived = student.isArchived();
+                    String action = isArchived ? "unarchive" : "archive";
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to " + action + " this student?", ButtonType.YES, ButtonType.NO);
+                    confirm.setHeaderText((isArchived ? "Unarchive" : "Archive") + " Student");
                     confirm.showAndWait().ifPresent(type -> {
                         if (type == ButtonType.YES) {
-                            // Remove from students.csv
+                            // Update in students.csv
                             File studentsFile = new File("students.csv");
                             java.util.List<String> allLines = new java.util.ArrayList<>();
                             if (studentsFile.exists()) {
                                 try (BufferedReader br = new BufferedReader(new FileReader(studentsFile))) {
-                                    String header = br.readLine();
-                                    if (header != null) allLines.add(header);
-                                    br.lines().forEach(allLines::add);
+                                    String line;
+                                    while ((line = br.readLine()) != null) {
+                                        allLines.add(line);
+                                    }
                                 } catch (IOException ex) {
                                     ex.printStackTrace();
                                 }
                             }
-                            java.util.List<String> filteredLines = new java.util.ArrayList<>();
-                            if (!allLines.isEmpty()) filteredLines.add(allLines.get(0));
-                            for (int i = 1; i < allLines.size(); i++) {
+                            for (int i = 0; i < allLines.size(); i++) {
                                 String line = allLines.get(i);
                                 String[] arr = line.split(",", -1);
-                                if (arr.length > 0 && !arr[0].equals(student.getStudentId())) {
-                                    filteredLines.add(line);
+                                if (arr.length > 0 && arr[0].equals(student.getStudentId())) {
+                                    // Set archived to true/false (last column)
+                                    if (arr.length < 22) {
+                                        // Add archived column if missing
+                                        StringBuilder sb = new StringBuilder(line);
+                                        sb.append(",").append(isArchived ? "false" : "true");
+                                        allLines.set(i, sb.toString());
+                                    } else {
+                                        arr[21] = isArchived ? "false" : "true";
+                                        allLines.set(i, String.join(",", arr));
+                                    }
+                                    break;
                                 }
                             }
                             try (java.io.FileWriter fw = new java.io.FileWriter(studentsFile, false)) {
-                                for (String line : filteredLines) {
+                                for (String line : allLines) {
                                     fw.write(line + "\n");
                                 }
                             } catch (IOException ex) {
                                 ex.printStackTrace();
                             }
-                            // Refresh the table instead of removing from filtered list
-                            initialize();
+                            // Set archived in memory
+                            student.setArchived(!isArchived);
+                            updateStudentFilter(); // Refresh filter after archiving/unarchiving
                         }
                     });
                 });
@@ -150,7 +166,9 @@ public class StudentsController {
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    HBox box = new HBox(5, editBtn, deleteBtn);
+                    Student student = getTableView().getItems().get(getIndex());
+                    archiveBtn.setText(student.isArchived() ? "Unarchive" : "Archive");
+                    HBox box = new HBox(5, editBtn, archiveBtn);
                     setGraphic(box);
                 }
             }
@@ -159,13 +177,62 @@ public class StudentsController {
 
     @FXML
     private void onExportCSV() {
-        String filePath = "students.csv";
-        try (FileWriter writer = new FileWriter(filePath)) {
-            writer.write("Student ID,Name,Course,Year,Date Enrolled\n");
-            for (Student student : studentsTable.getItems()) {
-                writer.write(student.getStudentId() + "," + student.getName() + "," + student.getCourse() + "," + student.getYear() + "," + student.getDateEnrolled() + "\n");
+        // File chooser dialog
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Students to CSV");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setInitialFileName("students.csv");
+        File file = fileChooser.showSaveDialog(studentsTable.getScene().getWindow());
+        if (file == null) return; // Only continue if user selected a file
+
+        // Column selection dialog
+        List<String> allColumns = List.of("Student ID", "Name", "Course", "Year", "Date Enrolled");
+        List<String> allFields = List.of("studentId", "name", "course", "year", "dateEnrolled");
+        List<CheckBox> checkBoxes = new ArrayList<>();
+        for (String col : allColumns) checkBoxes.add(new CheckBox(col));
+        checkBoxes.forEach(cb -> cb.setSelected(true));
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Select Columns to Export");
+        dialog.setHeaderText("Choose which columns to include in the CSV file:");
+        VBox vbox = new VBox(10);
+        vbox.getChildren().addAll(checkBoxes);
+        dialog.getDialogPane().setContent(vbox);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.setResizable(false);
+        dialog.showAndWait();
+        if (dialog.getResult() != ButtonType.OK) return;
+        List<Integer> selectedIndexes = new ArrayList<>();
+        for (int i = 0; i < checkBoxes.size(); i++) {
+            if (checkBoxes.get(i).isSelected()) selectedIndexes.add(i);
+        }
+        if (selectedIndexes.isEmpty()) {
+            showLogoAlert("Please select at least one column to export.", Alert.AlertType.ERROR);
+            return;
+        }
+        try (FileWriter writer = new FileWriter(file)) {
+            // Write header
+            for (int i = 0; i < selectedIndexes.size(); i++) {
+                writer.write(allColumns.get(selectedIndexes.get(i)));
+                if (i < selectedIndexes.size() - 1) writer.write(",");
             }
-            showLogoAlert("Students exported successfully to " + filePath, Alert.AlertType.INFORMATION);
+            writer.write("\n");
+            // Write data
+            for (Student student : studentsTable.getItems()) {
+                for (int i = 0; i < selectedIndexes.size(); i++) {
+                    String value = switch (allFields.get(selectedIndexes.get(i))) {
+                        case "studentId" -> student.getStudentId();
+                        case "name" -> student.getName();
+                        case "course" -> student.getCourse();
+                        case "year" -> student.getYear();
+                        case "dateEnrolled" -> student.getDateEnrolled();
+                        default -> "";
+                    };
+                    writer.write(value);
+                    if (i < selectedIndexes.size() - 1) writer.write(",");
+                }
+                writer.write("\n");
+            }
+            showLogoAlert("Students exported successfully to " + file.getAbsolutePath(), Alert.AlertType.INFORMATION);
         } catch (IOException e) {
             showLogoAlert("Error saving CSV file.", Alert.AlertType.ERROR);
             e.printStackTrace();
@@ -182,7 +249,6 @@ public class StudentsController {
         pane.setPrefSize(420, 180);
         pane.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
-        // Custom header (no space left/right/top, fits outline)
         HBox customHeader = new HBox();
         customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-radius: 0; -fx-background-insets: 0;");
         customHeader.setAlignment(Pos.CENTER_LEFT);
@@ -341,8 +407,11 @@ public class StudentsController {
         suffixField.setPromptText("Suffix (optional)");
         TextField emailField = new TextField(student != null ? student.getEmail() : "");
         emailField.setPromptText("Email");
-        TextField genderField = new TextField(student != null ? student.getGender() : "");
-        genderField.setPromptText("Gender");
+        // Gender as ComboBox (Sex: Male, Female)
+        ComboBox<String> genderCombo = new ComboBox<>();
+        genderCombo.getItems().addAll("Male", "Female");
+        genderCombo.setPromptText("Sex");
+        if (student != null) genderCombo.setValue(student.getGender());
         TextField addressField = new TextField(student != null ? student.getAddress() : "");
         addressField.setPromptText("Address");
         TextField contactField = new TextField(student != null ? student.getContactNumber() : "");
@@ -373,8 +442,8 @@ public class StudentsController {
         personalGrid.add(suffixField, 3, 1);
         personalGrid.add(new Label("Email:"), 0, 2);
         personalGrid.add(emailField, 1, 2);
-        personalGrid.add(new Label("Gender:"), 2, 2);
-        personalGrid.add(genderField, 3, 2);
+        personalGrid.add(new Label("Sex:"), 2, 2);
+        personalGrid.add(genderCombo, 3, 2);
         personalGrid.add(new Label("Address:"), 0, 3);
         personalGrid.add(addressField, 1, 3);
         personalGrid.add(new Label("Contact No.:", null), 2, 3);
@@ -466,7 +535,7 @@ public class StudentsController {
             String name = nameField.getText().trim();
             String suffix = suffixField.getText().trim();
             String email = emailField.getText().trim();
-            String gender = genderField.getText().trim();
+            String gender = genderCombo.getValue();
             String address = addressField.getText().trim();
             String contact = contactField.getText().trim();
             String program = programCombo.getValue();
@@ -482,6 +551,39 @@ public class StudentsController {
             boolean form137 = form137Box.isSelected();
             boolean goodMoral = goodMoralBox.isSelected();
             boolean medCert = medCertBox.isSelected();
+            // --- Validation ---
+            if (lrn.isEmpty()) {
+                showLogoAlert("LRN must not be empty.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (!name.matches("^[A-Za-z .,'-]+$") || name.matches(".*\\d.*")) {
+                showLogoAlert("Name must not contain numbers or special characters (except . , ' -).", Alert.AlertType.ERROR);
+                return;
+            }
+            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$")) {
+                showLogoAlert("Please enter a valid email address.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (contact.length() != 11 || !contact.matches("\\d{11}")) {
+                showLogoAlert("Contact No. must be exactly 11 digits.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (!fatherContact.isEmpty() && (!fatherContact.matches("\\d{11}"))) {
+                showLogoAlert("Father's Contact No. must be exactly 11 digits and contain only numbers.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (!motherContact.isEmpty() && (!motherContact.matches("\\d{11}"))) {
+                showLogoAlert("Mother's Contact No. must be exactly 11 digits and contain only numbers.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (!guardianContact.isEmpty() && (!guardianContact.matches("\\d{11}"))) {
+                showLogoAlert("Guardian's Contact No. must be exactly 11 digits and contain only numbers.", Alert.AlertType.ERROR);
+                return;
+            }
+            if (gender == null || (!gender.equals("Male") && !gender.equals("Female"))) {
+                showLogoAlert("Please select Sex (Male or Female).", Alert.AlertType.ERROR);
+                return;
+            }
             if (name.isEmpty() || email.isEmpty() || program == null || year == null || date == null ||
                     gender.isEmpty() || address.isEmpty() || contact.isEmpty()) {
                 showLogoAlert("Please fill out all fields.", Alert.AlertType.ERROR);
@@ -552,3 +654,4 @@ public class StudentsController {
         return year + randomNum;
     }
 }
+

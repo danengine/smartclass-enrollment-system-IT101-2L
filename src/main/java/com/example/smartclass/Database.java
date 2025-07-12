@@ -53,7 +53,11 @@ public class Database {
                 }
 
                 String[] data = line.trim().split(",");
-                if (data.length >= 19) {
+                if (data.length >= 21) {
+                    boolean archived = false;
+                    if (data.length > 21) {
+                        archived = Boolean.parseBoolean(data[21].trim());
+                    }
                     Student student = new Student(
                         data[0].trim(), // studentId
                         data[1].trim(), // lrn
@@ -75,7 +79,8 @@ public class Database {
                         Boolean.parseBoolean(data[17].trim()), // birthCertSubmitted
                         Boolean.parseBoolean(data[18].trim()), // form137Submitted
                         Boolean.parseBoolean(data[19].trim()), // goodMoralSubmitted
-                        Boolean.parseBoolean(data[20].trim())  // medCertSubmitted
+                        Boolean.parseBoolean(data[20].trim()), // medCertSubmitted
+                        archived // archived
                     );
                     students.add(student);
                 }

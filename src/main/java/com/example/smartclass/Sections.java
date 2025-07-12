@@ -7,9 +7,11 @@ import javafx.collections.transformation.FilteredList;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
+import javafx.stage.Stage;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -76,12 +78,15 @@ public class Sections {
         // --- Action Buttons (top right, like Enroll Student) ---
         HBox buttonBox = new HBox(10);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        Button createSectionBtn = new Button("+ Create Section");
-        createSectionBtn.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 6 18;");
-        Button deleteBtn = new Button("Delete Selected");
-        deleteBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 18;");
-        Button autoScheduleBtn = new Button("AI Auto Schedule");
-        autoScheduleBtn.setStyle("-fx-background-color: #00b894; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 18;");
+        Button createSectionBtn = new Button("\u2795 Create Section"); // ➕ icon for consistency
+        createSectionBtn.setPrefWidth(160);
+        createSectionBtn.setStyle("-fx-background-color: #0984e3; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
+        Button deleteBtn = new Button("\u274C Delete Selected"); // ❌ icon for consistency
+        deleteBtn.setPrefWidth(160);
+        deleteBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
+        Button autoScheduleBtn = new Button("\uD83E\uDD16 AI Auto Schedule"); // 🤖 icon for consistency
+        autoScheduleBtn.setPrefWidth(180);
+        autoScheduleBtn.setStyle("-fx-background-color: #00b894; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
         buttonBox.getChildren().addAll(createSectionBtn, deleteBtn, autoScheduleBtn);
 
         // --- Table of Sections (original logic, untouched) ---
@@ -190,17 +195,48 @@ public class Sections {
         // --- Create Section Button ---
         int finalDefaultIndex = defaultIndex;
         createSectionBtn.setOnAction(e -> {
-            // Popup dialog for section creation
-            Dialog<Void> dialog = new Dialog<>();
-            dialog.setTitle("Create Section");
-            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            // --- Custom Dialog Design (copied from enrollStudent) ---
+            Stage dialog = new Stage();
+            dialog.setTitle("");
+            dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
 
-            VBox dialogLayout = new VBox(12);
-            dialogLayout.setPadding(new Insets(10));
+            // --- Custom Header ---
+            HBox customHeader = new HBox();
+            customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-color: #b0b0b0; -fx-border-width: 0 0 1 0;");
+            customHeader.setAlignment(Pos.CENTER_LEFT);
+            customHeader.setMinHeight(48);
+            customHeader.setPrefHeight(48);
+            customHeader.setMaxWidth(Double.MAX_VALUE);
+            Label customTitle = new Label("Create Section");
+            customTitle.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 0 0 0 24; -fx-font-family: 'Segoe UI', Arial, sans-serif;");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button closeBtn = new Button("✕");
+            closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 18 0 18;");
+            closeBtn.setOnAction(event -> dialog.close());
+            customHeader.getChildren().addAll(customTitle, spacer, closeBtn);
+            // Enable window dragging using the custom header
+            final double[] dragOffset = new double[2];
+            customHeader.setOnMousePressed(event -> {
+                dragOffset[0] = event.getScreenX() - dialog.getX();
+                dragOffset[1] = event.getScreenY() - dialog.getY();
+            });
+            customHeader.setOnMouseDragged(event -> {
+                dialog.setX(event.getScreenX() - dragOffset[0]);
+                dialog.setY(event.getScreenY() - dragOffset[1]);
+            });
+
+            VBox root = new VBox(0); // No gap between header and content
+            root.setStyle("-fx-background-color: white; -fx-border-color: #b0b0b0; -fx-border-width: 2;");
+            root.getChildren().add(customHeader);
+            VBox content = new VBox(15);
+            content.setPadding(new Insets(20));
+            content.setStyle("");
 
             ComboBox<String> termSelect = new ComboBox<>(terms);
             termSelect.setPromptText("Select Term");
-            int localDefaultIndex = finalDefaultIndex; // Fix: use local variable for default index
+            int localDefaultIndex = finalDefaultIndex;
             if (!terms.isEmpty()) termSelect.setValue(terms.get(localDefaultIndex));
 
             ComboBox<String> programBox = new ComboBox<>();
@@ -249,58 +285,64 @@ public class Sections {
                 }
             });
 
-            dialogLayout.getChildren().addAll(
+            Button createBtn = new Button("Create Section");
+            createBtn.setStyle("-fx-font-size: 14px; -fx-padding: 8 24 8 24;");
+
+            content.getChildren().addAll(
                     new Label("Term:"), termSelect,
                     new Label("Program:"), programBox,
                     new Label("Section Name:"), sectionField,
-                    new Label("Select Courses:"), coursesTable
+                    new Label("Select Courses:"), coursesTable,
+                    createBtn
             );
-            dialog.getDialogPane().setContent(dialogLayout);
+            root.getChildren().add(content);
 
-            dialog.setResultConverter(btn -> {
-                if (btn == ButtonType.OK) {
-                    String program = programBox.getValue();
-                    String sectionInput = sectionField.getText().trim();
-                    String term = termSelect.getValue();
-                    ObservableList<String[]> selected = coursesTable.getSelectionModel().getSelectedItems();
-                    if (program == null || sectionInput.isEmpty() || selected.isEmpty() || term == null) {
-                        Alert alert = new Alert(Alert.AlertType.ERROR, "Please select a term, program, enter a section name, select at least one course.");
-                        alert.showAndWait();
-                        return null;
-                    }
-                    File coursesFile = new File("courses.csv");
-                    boolean fileExists = coursesFile.exists();
-                    java.util.Set<String> existing = new java.util.HashSet();
-                    if (fileExists) {
-                        try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
-                            br.readLine();
-                            br.lines().forEach(line -> {
-                                String[] arr = line.split(",", -1);
-                                if (arr.length >= 6) {
-                                    existing.add(arr[5] + "," + arr[1] + "," + arr[2]);
-                                }
-                            });
-                        } catch (IOException ex) { ex.printStackTrace(); }
-                    }
-                    // Split section names by comma, trim, and create for each
-                    String[] sectionNames = sectionInput.split(",");
-                    try (FileWriter fw = new FileWriter(coursesFile, true)) {
-                        if (!fileExists) fw.write("Program,Section,CourseCode,CourseName,Units,Term,Schedule\n");
-                        for (String section : sectionNames) {
-                            section = section.trim();
-                            if (section.isEmpty()) continue;
-                            for (String[] c : selected) {
-                                String key = term + "," + section + "," + c[0];
-                                if (existing.contains(key)) continue; // skip duplicate
-                                fw.write(program + "," + section + "," + c[0] + "," + c[1] + "," + c[2] + "," + term + ",N/A\n");
+            Scene scene = new Scene(root, 520, 520);
+            dialog.setScene(scene);
+            dialog.setOnShown(ev -> dialog.centerOnScreen());
+            dialog.show();
+
+            createBtn.setOnAction(ev -> {
+                String program = programBox.getValue();
+                String sectionInput = sectionField.getText().trim();
+                String term = termSelect.getValue();
+                ObservableList<String[]> selected = coursesTable.getSelectionModel().getSelectedItems();
+                if (program == null || sectionInput.isEmpty() || selected.isEmpty() || term == null) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Please select a term, program, enter a section name, select at least one course.");
+                    alert.showAndWait();
+                    return;
+                }
+                File coursesFile = new File("courses.csv");
+                boolean fileExists = coursesFile.exists();
+                java.util.Set<String> existing = new java.util.HashSet();
+                if (fileExists) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                        br.readLine();
+                        br.lines().forEach(line -> {
+                            String[] arr = line.split(",", -1);
+                            if (arr.length >= 6) {
+                                existing.add(arr[5] + "," + arr[1] + "," + arr[2]);
                             }
-                        }
+                        });
                     } catch (IOException ex) { ex.printStackTrace(); }
                 }
-                return null;
+                // Split section names by comma, trim, and create for each
+                String[] sectionNames = sectionInput.split(",");
+                try (FileWriter fw = new FileWriter(coursesFile, true)) {
+                    if (!fileExists) fw.write("Program,Section,CourseCode,CourseName,Units,Term,Schedule\n");
+                    for (String section : sectionNames) {
+                        section = section.trim();
+                        if (section.isEmpty()) continue;
+                        for (String[] c : selected) {
+                            String key = term + "," + section + "," + c[0];
+                            if (existing.contains(key)) continue; // skip duplicate
+                            fw.write(program + "," + section + "," + c[0] + "," + c[1] + "," + c[2] + "," + term + ",N/A\n");
+                        }
+                    }
+                } catch (IOException ex) { ex.printStackTrace(); }
+                dialog.close();
+                refreshSections.run();
             });
-            dialog.showAndWait();
-            refreshSections.run();
         });
 
         sectionTable.setRowFactory(tv -> {
@@ -641,6 +683,8 @@ public class Sections {
         autoScheduleBtn.setOnAction(e -> {
             loadingOverlay.setVisible(true);
             autoScheduleBtn.setDisable(true);
+            createSectionBtn.setDisable(true);
+            deleteBtn.setDisable(true);
             new Thread(() -> {
                 try {
                     JSONArray arr = new JSONArray();
@@ -692,14 +736,44 @@ public class Sections {
                     javafx.application.Platform.runLater(() -> {
                         loadingOverlay.setVisible(false);
                         autoScheduleBtn.setDisable(false);
-                        Dialog<ButtonType> dialog = new Dialog<>();
-                        dialog.setTitle("Confirm Auto-Schedule Changes");
-                        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+                        createSectionBtn.setDisable(false);
+                        deleteBtn.setDisable(false);
+                        // --- Custom Dialog with Custom Header (copied design from enrollStudent) ---
+                        Stage dialog = new Stage();
+                        dialog.setTitle("");
+                        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+                        dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
+                        HBox customHeader = new HBox();
+                        customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-color: #b0b0b0; -fx-border-width: 0 0 1 0;");
+                        customHeader.setAlignment(Pos.CENTER_LEFT);
+                        customHeader.setMinHeight(48);
+                        customHeader.setPrefHeight(48);
+                        customHeader.setMaxWidth(Double.MAX_VALUE);
+                        Label customTitle = new Label("Confirm Auto-Schedule Changes");
+                        customTitle.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 0 0 0 24; -fx-font-family: 'Segoe UI', Arial, sans-serif;");
+                        Region spacer = new Region();
+                        HBox.setHgrow(spacer, Priority.ALWAYS);
+                        Button closeBtn = new Button("✕");
+                        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 18 0 18;");
+                        closeBtn.setOnAction(event -> dialog.close());
+                        customHeader.getChildren().addAll(customTitle, spacer, closeBtn);
+                        // Enable window dragging using the custom header
+                        final double[] dragOffset = new double[2];
+                        customHeader.setOnMousePressed(event -> {
+                            dragOffset[0] = event.getScreenX() - dialog.getX();
+                            dragOffset[1] = event.getScreenY() - dialog.getY();
+                        });
+                        customHeader.setOnMouseDragged(event -> {
+                            dialog.setX(event.getScreenX() - dragOffset[0]);
+                            dialog.setY(event.getScreenY() - dragOffset[1]);
+                        });
+                        VBox root = new VBox(0); // No gap between header and content
+                        root.setStyle("-fx-background-color: white; -fx-border-color: #b0b0b0; -fx-border-width: 2;");
+                        root.getChildren().add(customHeader);
                         TableView<org.json.JSONObject> table = new TableView<>();
                         table.setEditable(true);
                         table.setPrefHeight(320);
                         table.setPrefWidth(700);
-                        // Only show courseCode, courseName, schedule columns
                         String[] cols = {"courseCode", "courseName", "schedule"};
                         for (String colName : cols) {
                             TableColumn<org.json.JSONObject, String> col = new TableColumn<>(colName.substring(0,1).toUpperCase()+colName.substring(1));
@@ -709,7 +783,6 @@ public class Sections {
                                 col.setMinWidth(200);
                                 col.setMaxWidth(Double.MAX_VALUE);
                                 col.setResizable(true);
-                                // Make schedule column editable
                                 col.setCellFactory(TextFieldTableCell.forTableColumn());
                                 col.setOnEditCommit(event -> {
                                     org.json.JSONObject obj = event.getRowValue();
@@ -726,97 +799,98 @@ public class Sections {
                             items.add(finalNewSchedules.getJSONObject(i));
                         }
                         table.setItems(items);
-
-                        // --- Conflict detection helper ---
+                        VBox vbox = new VBox(new Label("The following schedules will be applied. Proceed? (Conflicts are highlighted in red. You may edit schedules before confirming.)"), table);
+                        vbox.setPadding(new Insets(10));
+                        root.getChildren().add(vbox);
+                        HBox buttonBar = new HBox(10);
+                        buttonBar.setAlignment(Pos.CENTER_RIGHT);
+                        Button okBtn = new Button("OK");
+                        Button cancelBtn = new Button("Cancel");
+                        okBtn.setStyle("-fx-font-size: 14px; -fx-padding: 8 24 8 24; -fx-background-color: #0984e3; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
+                        cancelBtn.setStyle("-fx-font-size: 14px; -fx-padding: 8 24 8 24; -fx-background-color: #b0b0b0; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
+                        buttonBar.getChildren().addAll(okBtn, cancelBtn);
+                        // Add extra vertical space between table and buttons
+                        Region buttonSpacer = new Region();
+                        buttonSpacer.setMinHeight(24); // Adjust height as needed
+                        vbox.getChildren().add(buttonSpacer);
+                        vbox.getChildren().add(buttonBar);
+                        Scene scene = new Scene(root, 820, 400);
+                        dialog.setScene(scene);
+                        dialog.setOnShown(ev -> dialog.centerOnScreen());
+                        cancelBtn.setOnAction(ev -> dialog.close());
+                        okBtn.setOnAction(ev -> {
+                            // Before saving, check for any remaining conflicts
+                            for (org.json.JSONObject obj1 : items) {
+                                for (org.json.JSONObject obj2 : items) {
+                                    if (obj1 == obj2) continue;
+                                    if (isScheduleConflict(obj1, obj2)) {
+                                        Alert alert = new Alert(Alert.AlertType.ERROR, "Cannot save: There are still schedule conflicts highlighted in red.");
+                                        alert.showAndWait();
+                                        return;
+                                    }
+                                }
+                            }
+                            File coursesFile = new File("courses.csv");
+                            List<String> lines = new ArrayList<>();
+                            try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
+                                String header = br.readLine();
+                                if (header != null) lines.add(header);
+                                br.lines().forEach(lines::add);
+                            } catch (IOException ex) { ex.printStackTrace(); }
+                            for (org.json.JSONObject sched : items) {
+                                for (int j = 1; j < lines.size(); j++) {
+                                    String[] arrLine = lines.get(j).split(",", -1);
+                                    if (arrLine.length >= 7 &&
+                                            arrLine[5].equals(sched.optString("term")) &&
+                                            arrLine[1].equals(sched.optString("section")) &&
+                                            arrLine[0].equals(sched.optString("program")) &&
+                                            arrLine[2].equals(sched.optString("courseCode")) &&
+                                            arrLine[3].equals(sched.optString("courseName"))) {
+                                        arrLine[6] = sched.optString("schedule");
+                                        lines.set(j, String.join(",", arrLine));
+                                    }
+                                }
+                            }
+                            try (FileWriter fw = new FileWriter(coursesFile, false)) {
+                                for (String l : lines) fw.write(l + "\n");
+                            } catch (IOException ex) { ex.printStackTrace(); }
+                            refreshSections.run();
+                            dialog.close();
+                        });
+                        // Highlight conflicts in the confirm auto-schedule changes dialog table
+                        for (org.json.JSONObject obj : items) {
+                            boolean conflict = false;
+                            for (org.json.JSONObject other : items) {
+                                if (obj == other) continue;
+                                if (isScheduleConflict(obj, other)) {
+                                    conflict = true;
+                                    break;
+                                }
+                            }
+                            obj.put("_conflict", conflict);
+                        }
                         table.setRowFactory(tv -> new TableRow<org.json.JSONObject>() {
                             @Override
                             protected void updateItem(org.json.JSONObject item, boolean empty) {
                                 super.updateItem(item, empty);
                                 if (item == null || empty) {
                                     setStyle("");
+                                } else if (item.optBoolean("_conflict", false)) {
+                                    setStyle("-fx-background-color: #ffcccc;");
                                 } else {
-                                    boolean conflict = false;
-                                    for (org.json.JSONObject other : table.getItems()) {
-                                        if (other == item) continue;
-                                        if (isScheduleConflict(item, other)) {
-                                            conflict = true;
-                                            break;
-                                        }
-                                    }
-                                    if (conflict) {
-                                        setStyle("-fx-background-color: #ffcccc;");
-                                    } else {
-                                        setStyle("");
-                                    }
+                                    setStyle("");
                                 }
                             }
                         });
-
-                        // Re-check conflicts on edit
-                        items.addListener((javafx.collections.ListChangeListener<org.json.JSONObject>) c -> table.refresh());
-                        // Remove: table.setOnEditCommit(e -> table.refresh());
-                        // Instead, add edit commit handler to the schedule column only
-                        for (TableColumn<org.json.JSONObject, ?> col : table.getColumns()) {
-                            if (col.getText().equalsIgnoreCase("Schedule")) {
-                                ((TableColumn<org.json.JSONObject, String>) col).setOnEditCommit(event -> {
-                                    org.json.JSONObject obj = event.getRowValue();
-                                    obj.put("schedule", event.getNewValue());
-                                    table.refresh();
-                                });
-                            }
-                        }
-
-                        VBox vbox = new VBox(new Label("The following schedules will be applied. Proceed? (Conflicts are highlighted in red. You may edit schedules before confirming.)"), table);
-                        vbox.setPadding(new Insets(10));
-                        dialog.getDialogPane().setContent(vbox);
-                        dialog.setResizable(true);
-                        dialog.setResultConverter(btn -> btn);
-                        dialog.showAndWait().ifPresent(btn -> {
-                            if (btn == ButtonType.OK) {
-                                // Before saving, check for any remaining conflicts
-                                for (org.json.JSONObject obj1 : items) {
-                                    for (org.json.JSONObject obj2 : items) {
-                                        if (obj1 == obj2) continue;
-                                        if (isScheduleConflict(obj1, obj2)) {
-                                            Alert alert = new Alert(Alert.AlertType.ERROR, "Cannot save: There are still schedule conflicts highlighted in red.");
-                                            alert.showAndWait();
-                                            return;
-                                        }
-                                    }
-                                }
-                                File coursesFile = new File("courses.csv");
-                                List<String> lines = new ArrayList<>();
-                                try (BufferedReader br = new BufferedReader(new FileReader(coursesFile))) {
-                                    String header = br.readLine();
-                                    if (header != null) lines.add(header);
-                                    br.lines().forEach(lines::add);
-                                } catch (IOException ex) { ex.printStackTrace(); }
-                                for (org.json.JSONObject sched : items) {
-                                    for (int j = 1; j < lines.size(); j++) {
-                                        String[] arrLine = lines.get(j).split(",", -1);
-                                        if (arrLine.length >= 7 &&
-                                                arrLine[5].equals(sched.optString("term")) &&
-                                                arrLine[1].equals(sched.optString("section")) &&
-                                                arrLine[0].equals(sched.optString("program")) &&
-                                                arrLine[2].equals(sched.optString("courseCode")) &&
-                                                arrLine[3].equals(sched.optString("courseName"))) {
-                                            arrLine[6] = sched.optString("schedule");
-                                            lines.set(j, String.join(",", arrLine));
-                                        }
-                                    }
-                                }
-                                try (FileWriter fw = new FileWriter(coursesFile, false)) {
-                                    for (String l : lines) fw.write(l + "\n");
-                                } catch (IOException ex) { ex.printStackTrace(); }
-                                refreshSections.run();
-                            }
-                        });
+                        dialog.showAndWait();
                     });
                 } finally {
                     // In case of any unexpected error, ensure loading is hidden
                     javafx.application.Platform.runLater(() -> {
                         loadingOverlay.setVisible(false);
                         autoScheduleBtn.setDisable(false);
+                        createSectionBtn.setDisable(false);
+                        deleteBtn.setDisable(false);
                     });
                 }
             }).start();
@@ -863,7 +937,7 @@ public class Sections {
         return rootPane;
     }
 
-    // Helper method forS schedule days
+    // Helper method forS schedsaasule days
     public static String getScheduleDays(String startDay, int units) {
         String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
         int idx = -1;

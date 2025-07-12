@@ -74,6 +74,19 @@ public class AdminDashboardController {
     }
 
     private void showDashboard() {
+        // Get latest term from terms.csv
+        String latestTerm = null;
+        try (BufferedReader termReader = new BufferedReader(new FileReader("terms.csv"))) {
+            String line;
+            while ((line = termReader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    latestTerm = line.trim();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         // Read all students
         Set<String> allStudentIds = new HashSet<>();
         try (BufferedReader reader = new BufferedReader(new FileReader("students.csv"))) {
@@ -87,14 +100,18 @@ public class AdminDashboardController {
             e.printStackTrace();
         }
 
-        // Read enrollments.csv and collect enrolled student IDs
+        // Read enrollments.csv and collect enrolled student IDs for the latest term only
         Set<String> enrolledIds = new HashSet<>();
         try (BufferedReader reader = new BufferedReader(new FileReader("enrollments.csv"))) {
             String line = reader.readLine(); // skip header
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                if (parts.length < 1) continue;
-                enrolledIds.add(parts[0].trim());
+                if (parts.length < 6) continue;
+                String studentId = parts[0].trim();
+                String term = parts[5].trim();
+                if (latestTerm != null && term.equals(latestTerm)) {
+                    enrolledIds.add(studentId);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -158,7 +175,7 @@ public class AdminDashboardController {
         animateCount(unenrolledCount, totalUnenrolled);
         animateCount(totalCount, totalStudents);
 
-        // Enrollment by program (Donut Chart, minimalist card)
+        // Enrollment by program (Donut Chart, minimalist card) - only for current term
         Map<String, Integer> programCounts = new HashMap<>();
         try (BufferedReader reader = new BufferedReader(new FileReader("enrollments.csv"))) {
             String line = reader.readLine(); // skip header
@@ -167,7 +184,8 @@ public class AdminDashboardController {
                 if (parts.length < 6) continue;
                 String program = parts[2].trim();
                 String status = parts[4].trim();
-                if ("Enrolled".equalsIgnoreCase(status)) {
+                String term = parts[5].trim();
+                if ("Enrolled".equalsIgnoreCase(status) && latestTerm != null && term.equals(latestTerm)) {
                     programCounts.put(program, programCounts.getOrDefault(program, 0) + 1);
                 }
             }
@@ -247,15 +265,35 @@ public class AdminDashboardController {
     }
 
     private void showProgramsTable() {
+        // --- Card Layout for Programs List ---
+        StackPane rootPane = new StackPane();
+        rootPane.setStyle("-fx-background-color: #f4f6f7;");
+
+        VBox outerVBox = new VBox(20);
+        outerVBox.setAlignment(Pos.TOP_CENTER);
+        outerVBox.setStyle("-fx-padding: 36 32 36 32;");
+
+        VBox card = new VBox(16);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 12; -fx-border-color: #dcdde1; -fx-border-radius: 12; -fx-padding: 24 24 24 24; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 12, 0, 0, 4);");
+
+        // Title
+        HBox titleBox = new HBox(12);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        Label titleLabel = new Label("🎓 Programs List");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        titleBox.getChildren().add(titleLabel);
+
+        // TableView
         TableView<String> programTable = new TableView<>();
+        programTable.setPrefHeight(340);
+        programTable.setStyle("-fx-background-radius: 0;");
         TableColumn<String, String> programCol = new TableColumn<>("Program");
         programCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()));
         programCol.setPrefWidth(500);
         programTable.getColumns().add(programCol);
-
         ObservableList<String> programs = Database.showPrograms();
         programTable.setItems(programs);
-
         programTable.setRowFactory(tv -> {
             TableRow<String> row = new TableRow<>();
             row.setOnMouseClicked(event -> {
@@ -267,21 +305,85 @@ public class AdminDashboardController {
             return row;
         });
 
-        Button createProgramButton = new Button("+ Create Program");
+        // Button design (copy exact design from Enroll Student button in onEnrollmentsClick)
+        Button createProgramButton = new Button("➕ Create Program");
+        createProgramButton.setPrefWidth(140);
+        createProgramButton.setStyle("-fx-background-color: #0984e3; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
         createProgramButton.setOnAction(e -> {
-            // Show dialog or form to enter program name
-            TextInputDialog dialog = new TextInputDialog();
-            dialog.setTitle("Add Program");
-            dialog.setHeaderText("Enter new program name:");
-            dialog.showAndWait().ifPresent(name -> {
-                Database.addProgram(name);
-                programTable.setItems(Database.showPrograms()); // Refresh
-            });
-        });
+            Stage dialog = new Stage();
+            dialog.setTitle("");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initStyle(javafx.stage.StageStyle.UNDECORATED);
 
-        Button deleteProgramButton = new Button("Delete Program");
-        deleteProgramButton.setDisable(true);
-        deleteProgramButton.setOnAction(e -> {
+            // --- Custom Header (copied from enrollStudent) ---
+            HBox customHeader = new HBox();
+            customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-color: #b0b0b0; -fx-border-width: 0 0 1 0;");
+            customHeader.setAlignment(Pos.CENTER_LEFT);
+            customHeader.setMinHeight(48);
+            customHeader.setPrefHeight(48);
+            customHeader.setMaxWidth(Double.MAX_VALUE);
+            Label customTitle = new Label("Add Program");
+            customTitle.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 0 0 0 24; -fx-font-family: 'Segoe UI', Arial, sans-serif;");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button closeBtn = new Button("✕");
+            closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 18 0 18;");
+            closeBtn.setOnAction(event -> dialog.close());
+            customHeader.getChildren().addAll(customTitle, spacer, closeBtn);
+            // Enable window dragging using the custom header
+            final double[] dragOffset = new double[2];
+            customHeader.setOnMousePressed(event -> {
+                dragOffset[0] = event.getScreenX() - dialog.getX();
+                dragOffset[1] = event.getScreenY() - dialog.getY();
+            });
+            customHeader.setOnMouseDragged(event -> {
+                dialog.setX(event.getScreenX() - dragOffset[0]);
+                dialog.setY(event.getScreenY() - dragOffset[1]);
+            });
+
+            VBox root = new VBox(0);
+            root.setStyle("-fx-background-color: white; -fx-border-color: #b0b0b0; -fx-border-width: 2;");
+            root.getChildren().add(customHeader);
+            VBox content = new VBox(15);
+            content.setPadding(new Insets(20));
+            content.setStyle("");
+
+            Label label = new Label("Enter new program name:");
+            TextField nameField = new TextField();
+            nameField.setPromptText("Program Name");
+            nameField.setPrefWidth(300);
+            nameField.setStyle("-fx-font-size: 14px;");
+            Button addBtn = new Button("Add Program");
+            addBtn.setStyle("-fx-font-size: 14px; -fx-padding: 8 24 8 24;");
+            addBtn.setOnAction(ev -> {
+                String name = nameField.getText().trim();
+                if (!name.isEmpty()) {
+                    Database.addProgram(name);
+                    programTable.setItems(Database.showPrograms());
+                    dialog.close();
+                }
+            });
+            content.getChildren().addAll(label, nameField, addBtn);
+            root.getChildren().add(content);
+            Scene scene = new Scene(root, 420, 200);
+            dialog.setScene(scene);
+            dialog.setOnShown(ev -> dialog.centerOnScreen());
+            dialog.showAndWait();
+        });
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        Region buttonSpacer = new Region();
+        HBox.setHgrow(buttonSpacer, Priority.ALWAYS);
+        buttonBox.getChildren().addAll(buttonSpacer, createProgramButton);
+
+        Button deleteBtn = new Button("Delete Program");
+        deleteBtn.setPrefWidth(140);
+        deleteBtn.setStyle("-fx-background-color: #636e72; -fx-text-fill: white; -fx-background-radius: 8; -fx-font-weight: bold;");
+        deleteBtn.setDisable(true);
+        programTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+            deleteBtn.setDisable(newSel == null);
+        });
+        deleteBtn.setOnAction(e -> {
             String selected = programTable.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to delete this program? This will also delete all its courses.", ButtonType.YES, ButtonType.NO);
@@ -289,19 +391,18 @@ public class AdminDashboardController {
                 confirm.showAndWait().ifPresent(type -> {
                     if (type == ButtonType.YES) {
                         Database.deleteProgram(selected);
-                        programTable.setItems(Database.showPrograms()); // Refresh
+                        programTable.setItems(Database.showPrograms());
                     }
                 });
             }
         });
-        programTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
-            deleteProgramButton.setDisable(newSel == null);
-        });
+        buttonBox.getChildren().add(deleteBtn);
 
-        HBox buttonBox = new HBox(10, createProgramButton, deleteProgramButton);
-        VBox layout = new VBox(10, new Label("Programs"), programTable, buttonBox);
-        layout.setPadding(new Insets(20));
-        setMainContent(layout);
+        card.getChildren().addAll(titleBox, programTable, buttonBox);
+        outerVBox.getChildren().add(card);
+        rootPane.getChildren().add(outerVBox);
+
+        setMainContent(rootPane);
     }
 
     private <T> TableColumn<Course, T> createEditableColumn(String title,
@@ -327,8 +428,44 @@ public class AdminDashboardController {
 
     private void openCoursesWindow(String program) {
         Stage courseStage = new Stage();
-        courseStage.setTitle(program + " Courses");
+        courseStage.setTitle("");
+        courseStage.initModality(Modality.APPLICATION_MODAL);
+        courseStage.initStyle(javafx.stage.StageStyle.UNDECORATED); // Remove window decorations
 
+        // --- Custom Header (copied from enrollStudent) ---
+        HBox customHeader = new HBox();
+        customHeader.setStyle("-fx-background-color: #1e3d59; -fx-padding: 0; -fx-border-color: #b0b0b0; -fx-border-width: 0 0 1 0;");
+        customHeader.setAlignment(Pos.CENTER_LEFT);
+        customHeader.setMinHeight(48);
+        customHeader.setPrefHeight(48);
+        customHeader.setMaxWidth(Double.MAX_VALUE);
+        Label customTitle = new Label(program + " Courses");
+        customTitle.setStyle("-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 0 0 0 24; -fx-font-family: 'Segoe UI', Arial, sans-serif;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button closeBtn = new Button("✕");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 18 0 18;");
+        closeBtn.setOnAction(event -> courseStage.close());
+        customHeader.getChildren().addAll(customTitle, spacer, closeBtn);
+        // Enable window dragging using the custom header
+        final double[] dragOffset = new double[2];
+        customHeader.setOnMousePressed(event -> {
+            dragOffset[0] = event.getScreenX() - courseStage.getX();
+            dragOffset[1] = event.getScreenY() - courseStage.getY();
+        });
+        customHeader.setOnMouseDragged(event -> {
+            courseStage.setX(event.getScreenX() - dragOffset[0]);
+            courseStage.setY(event.getScreenY() - dragOffset[1]);
+        });
+
+        VBox root = new VBox(0); // No gap between header and content
+        root.setStyle("-fx-background-color: white; -fx-border-color: #b0b0b0; -fx-border-width: 2;");
+        root.getChildren().add(customHeader);
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setStyle("");
+
+        // TableView
         TableView<Course> courseTable = new TableView<>();
         courseTable.setEditable(true);
 
@@ -528,8 +665,8 @@ public class AdminDashboardController {
         });
 
         HBox buttonBox = new HBox(10, addCourseBtn, deleteCourseBtn, uploadPdfBtn);
-        VBox root = new VBox(10, new Label("Courses in " + program), courseTable, buttonBox);
-        root.setPadding(new Insets(20));
+        content.getChildren().addAll(new Label("Courses in " + program), courseTable, buttonBox);
+        root.getChildren().add(content);
 
         courseStage.setScene(new Scene(root, 700, 450));
         courseStage.initModality(Modality.APPLICATION_MODAL);
@@ -903,7 +1040,10 @@ public class AdminDashboardController {
 
         Scene scene = new Scene(root, 820, 400);
         dialog.setScene(scene);
-        dialog.centerOnScreen();
+        // Center the dialog on the screen
+        dialog.setOnShown(e -> {
+            dialog.centerOnScreen();
+        });
         dialog.showAndWait();
     }
 
@@ -912,7 +1052,6 @@ public class AdminDashboardController {
         dialog.setTitle("Manage Enrollment for " + student[1]);
         dialog.initModality(Modality.APPLICATION_MODAL);
 
-        // Make dialog full screen
         dialog.setMaximized(true);
 
         VBox root = new VBox(18);
@@ -933,7 +1072,6 @@ public class AdminDashboardController {
         ObservableList<String[]> enrolledCourses = FXCollections.observableArrayList();
         FilteredList<String[]> filteredAvailableCourses = new FilteredList<>(availableCourses, ac -> true);
 
-        // --- Collect all courses already enrolled in any term for this student ---
         Set<String> allEnrolledCourseCodes = new HashSet<>();
         if (student[0] != null) {
             File studentDir = new File("students/" + student[0]);

@@ -23,6 +23,7 @@ public class Student {
     private String fatherContact;
     private String motherContact;
     private String guardianContact;
+    private boolean archived;
 
     public Student(String studentId, String lrn, String name, String suffix, String email,
                    String gender, String address, String contactNumber,
@@ -30,7 +31,8 @@ public class Student {
                    String fatherName, String fatherContact,
                    String motherName, String motherContact,
                    String guardianName, String guardianContact,
-                   boolean birthCertSubmitted, boolean form137Submitted, boolean goodMoralSubmitted, boolean medCertSubmitted) {
+                   boolean birthCertSubmitted, boolean form137Submitted, boolean goodMoralSubmitted, boolean medCertSubmitted,
+                   boolean archived) {
         this.studentId = studentId;
         this.lrn = lrn;
         this.name = name;
@@ -52,6 +54,7 @@ public class Student {
         this.form137Submitted = form137Submitted;
         this.goodMoralSubmitted = goodMoralSubmitted;
         this.medCertSubmitted = medCertSubmitted;
+        this.archived = archived;
     }
 
     public String getStudentId() {
@@ -142,6 +145,10 @@ public class Student {
         return guardianContact;
     }
 
+    public boolean isArchived() {
+        return archived;
+    }
+
     public void setStudentId(String studentId) {
         this.studentId = studentId;
     }
@@ -228,5 +235,9 @@ public class Student {
 
     public void setGuardianContact(String guardianContact) {
         this.guardianContact = guardianContact;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 }
